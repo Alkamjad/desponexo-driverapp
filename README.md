@@ -51,15 +51,5 @@ Danach siehst du die Änderungen hier:
 - `https://github.com/Alkamjad/Driverapp/tree/workplace`
 - `https://github.com/Alkamjad/Driverapp/commits/workplace`
 
-## PR-Fehlerbehebung (wenn in Codex kein GitHub-PR sichtbar ist)
 
-Wenn in Codex kein „PR anzeigen“ erscheint, liegt oft kein `origin`-Remote in der Container-Umgebung vor.
-
-Prüfen:
-
-```bash
-git remote -v
-```
-
-Wenn keine Ausgabe kommt, ist das Repository lokal vorhanden, aber nicht mit GitHub in dieser Umgebung verbunden.
 
