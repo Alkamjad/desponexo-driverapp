@@ -119,8 +119,9 @@ Deno.serve(async (req) => {
         const API_BASE_URL = Deno.env.get('DRIVER_APP_DOMAIN') || 'https://desponexodriver.app';
         await fetch(`${API_BASE_URL}/functions/sendPushNotification`, {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
+          headers: {
+            'Content-Type': 'application/json',
+            'x-internal-secret': Deno.env.get('INTERNAL_FUNCTION_SECRET') || ''
           },
           body: JSON.stringify({
             fcm_token: driverData.fcm_token,

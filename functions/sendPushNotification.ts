@@ -9,6 +9,22 @@ import { getCorsHeaders } from './_shared/cors.ts';
 
 let firebaseApp = null;
 
+function verifyInternalRequest(req: Request) {
+  const expectedSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+
+  // Wenn kein Secret gesetzt ist -> fail closed (sicherer Default)
+  if (!expectedSecret) {
+    return { valid: false, status: 500, error: 'INTERNAL_FUNCTION_SECRET missing' };
+  }
+
+  const requestSecret = req.headers.get('x-internal-secret') || '';
+  if (requestSecret !== expectedSecret) {
+    return { valid: false, status: 401, error: 'Unauthorized internal request' };
+  }
+
+  return { valid: true };
+}
+
 // Firebase Admin SDK initialisieren
 function getFirebaseApp() {
   if (firebaseApp) return firebaseApp;
@@ -19,7 +35,7 @@ function getFirebaseApp() {
   }
 
   const serviceAccount = JSON.parse(credentials);
-  
+
   firebaseApp = initializeApp({
     credential: cert(serviceAccount)
   });
@@ -34,20 +50,23 @@ Deno.serve(async (req) => {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
 
-  // No auth required - internal function called by saveNotification
+  const internalAuth = verifyInternalRequest(req);
+  if (!internalAuth.valid) {
+    return Response.json({ error: internalAuth.error }, { status: internalAuth.status, headers: corsHeaders });
+  }
+
   try {
     const { fcm_token, title, body, data = {} } = await req.json();
 
     if (!fcm_token || !title) {
-      return Response.json({ 
-        error: 'fcm_token und title erforderlich' 
+      return Response.json({
+        error: 'fcm_token und title erforderlich'
       }, { status: 400, headers: corsHeaders });
     }
 
     const app = getFirebaseApp();
     const messaging = getMessaging(app);
 
-    // Push Notification senden
     const message = {
       token: fcm_token,
       notification: {
@@ -78,19 +97,17 @@ Deno.serve(async (req) => {
     };
 
     const response = await messaging.send(message);
-    
-    console.log('✅ Push Notification gesendet:', response);
 
-    return Response.json({ 
+    return Response.json({
       success: true,
-      message_id: response 
-    });
+      message_id: response
+    }, { status: 200, headers: corsHeaders });
 
   } catch (error) {
     console.error('❌ Push Notification Fehler:', error);
-    return Response.json({ 
+    return Response.json({
       error: error.message,
-      code: error.code 
+      code: error.code
     }, { status: 500, headers: corsHeaders });
-    }
-    });
+  }
+});
