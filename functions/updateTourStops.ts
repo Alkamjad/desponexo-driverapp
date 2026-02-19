@@ -50,7 +50,7 @@ async function verifyRequest(req) {
 }
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://desponexodriver.app',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Access-Control-Allow-Credentials': 'true',
