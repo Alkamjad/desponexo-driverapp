@@ -5,6 +5,7 @@
 
 import { initializeApp, cert } from 'npm:firebase-admin@13.0.2/app';
 import { getMessaging } from 'npm:firebase-admin@13.0.2/messaging';
+import { getCorsHeaders } from './_shared/cors.ts';
 
 let firebaseApp = null;
 
@@ -27,9 +28,7 @@ function getFirebaseApp() {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = {
-    'Content-Type': 'application/json'
-  };
+  const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });

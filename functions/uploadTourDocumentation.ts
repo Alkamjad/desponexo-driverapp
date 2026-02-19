@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { getCorsHeaders } from './_shared/cors.ts';
 
 async function verifyRequest(req) {
   try {
@@ -71,13 +72,7 @@ async function verifyRequest(req) {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': 'https://desponexodriver.app',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json'
-  };
+  const corsHeaders = getCorsHeaders({ methods: 'GET, POST, OPTIONS' });
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
