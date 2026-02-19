@@ -57,8 +57,10 @@ Lege in deiner Hosting-Plattform folgende Variable an:
 - `VITE_FUNCTIONS_BASE_URL` (z. B. `https://desponexodriver.app`)
 - `VITE_SUPABASE_URL` (deine Supabase Projekt-URL)
 - `VITE_SUPABASE_ANON_KEY` (dein Supabase anon key)
-- `ALLOWED_ORIGIN` (für Backend Functions CORS, z. B. `https://dein-projekt.vercel.app`)
+- `ALLOWED_ORIGIN` (**Pflicht in Prod**) für Backend-Functions-CORS, z. B. `https://dein-projekt.vercel.app`
+- `ALLOW_ALL_CORS` (optional, nur lokal/dev auf `true` setzen)
 - `INTERNAL_FUNCTION_SECRET` (Backend-internes Secret für geschützte interne Function-Calls wie `sendPushNotification`)
 
 Wenn `VITE_FUNCTIONS_BASE_URL` nicht gesetzt ist, nutzt das Frontend automatisch die aktuelle Origin (`window.location.origin`).
+Ohne `ALLOWED_ORIGIN` blocken die Functions Browser-CORS standardmäßig (fail-closed).
 

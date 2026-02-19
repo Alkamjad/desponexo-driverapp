@@ -1,5 +1,5 @@
 import { getCorsHeaders } from './_shared/cors.ts';
-import { createAnonSupabaseClient, createServiceSupabaseClient, getSupabaseEnv } from './_shared/supabaseAdmin.ts';
+import { createAnonSupabaseClient, createServiceSupabaseClient, hasRequiredSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
 async function verifyRequest(req) {
   try {
@@ -11,13 +11,8 @@ async function verifyRequest(req) {
     
     const token = authHeader.replace('Bearer ', '');
     
-    const { url: supabaseUrl, anonKey: supabaseAnonKey, serviceRoleKey: serviceKey } = getSupabaseEnv();
-    if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
-      console.error('❌ ENV CONFIG MISSING:', {
-        SUPABASE_URL: !!supabaseUrl,
-        SUPABASE_ANON_KEY: !!supabaseAnonKey,
-        SUPABASE_SERVICE_ROLE_KEY: !!serviceKey
-      });
+    if (!hasRequiredSupabaseEnv()) {
+      console.error('❌ ENV CONFIG MISSING');
       return { valid: false, status: 500 };
     }
     
@@ -94,14 +89,8 @@ Deno.serve(async (req) => {
     // Nutze driver_id AUS TOKEN, nicht aus Body
     const driver_id = auth.driver_id;
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-    if (!supabaseUrl || !serviceKey) {
-      console.error('❌ ENV CONFIG MISSING IN MAIN:', {
-        SUPABASE_URL: !!supabaseUrl,
-        SUPABASE_SERVICE_ROLE_KEY: !!serviceKey
-      });
+    if (!hasRequiredSupabaseEnv()) {
+      console.error('❌ ENV CONFIG MISSING IN MAIN');
       return new Response(
         JSON.stringify({ success: false, error: 'Server-Konfiguration fehlt' }),
         { status: 500, headers: corsHeaders }

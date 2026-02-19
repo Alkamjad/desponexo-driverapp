@@ -38,43 +38,6 @@ async function verifyRequest(req: Request) {
   }
 }
 
-const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
-
-async function verifyRequest(req: Request) {
-  try {
-    const authHeader = req.headers.get('Authorization') || '';
-    if (!authHeader.startsWith('Bearer ')) {
-      return { valid: false, status: 401, error: 'Missing or invalid Authorization header' };
-    }
-
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
-      return { valid: false, status: 500, error: 'Server config missing' };
-    }
-
-    const token = authHeader.replace('Bearer ', '').trim();
-    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey);
-    const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
-    if (error || !user) {
-      return { valid: false, status: 401, error: 'Invalid or expired token' };
-    }
-
-    const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: driver, error: driverError } = await supabaseService
-      .from('drivers')
-      .select('id, email')
-      .eq('user_id', user.id)
-      .single();
-
-    if (driverError || !driver) {
-      return { valid: false, status: 403, error: 'Driver not found' };
-    }
-
-    return { valid: true, driverId: driver.id, driverEmail: driver.email };
-  } catch (error) {
-    return { valid: false, status: 401, error: error.message };
-  }
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
