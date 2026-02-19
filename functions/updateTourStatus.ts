@@ -1,11 +1,9 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { getCorsHeaders } from './_shared/cors.ts';
+import { createAnonSupabaseClient, createServiceSupabaseClient, getSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
 async function verifyRequest(req) {
   try {
     const authHeader = req.headers.get('Authorization') || '';
-    console.log('AUTH prefix', authHeader.slice(0, 20));
-    console.log('AUTH token length', authHeader.startsWith('Bearer ') ? authHeader.slice(7).length : -1);
-    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       console.error('❌ NO BEARER TOKEN');
       return { valid: false, status: 401 };
@@ -13,38 +11,7 @@ async function verifyRequest(req) {
     
     const token = authHeader.replace('Bearer ', '');
     
-    // DEBUG JWT PAYLOAD (ohne Token zu leaken)
-    try {
-      const parts = token.split('.');
-      if (parts.length === 3) {
-        const payload = JSON.parse(atob(parts[1]));
-        console.log('JWT PAYLOAD DEBUG:', {
-          iss: payload.iss,
-          aud: payload.aud,
-          exp: payload.exp,
-          exp_date: new Date(payload.exp * 1000).toISOString(),
-          sub: payload.sub,
-          now: Math.floor(Date.now() / 1000),
-          is_expired: Math.floor(Date.now() / 1000) > payload.exp
-        });
-      }
-    } catch (decodeError) {
-      console.warn('⚠️ Could not decode JWT payload:', decodeError.message);
-    }
-    
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    // ENV GUARD + DEBUG KEYS
-    console.log('✅ ENV CHECK:', {
-      HAS_SUPABASE_URL: !!supabaseUrl,
-      HAS_ANON_KEY: !!supabaseAnonKey,
-      ANON_KEY_PREFIX: supabaseAnonKey ? supabaseAnonKey.slice(0, 10) : 'MISSING',
-      HAS_SERVICE_ROLE_KEY: !!serviceKey,
-      SERVICE_ROLE_PREFIX: serviceKey ? serviceKey.slice(0, 10) : 'MISSING'
-    });
-    
+    const { url: supabaseUrl, anonKey: supabaseAnonKey, serviceRoleKey: serviceKey } = getSupabaseEnv();
     if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
       console.error('❌ ENV CONFIG MISSING:', {
         SUPABASE_URL: !!supabaseUrl,
@@ -54,11 +21,8 @@ async function verifyRequest(req) {
       return { valid: false, status: 500 };
     }
     
-    console.log('✅ SUPABASE CONFIG:', { SUPABASE_URL: supabaseUrl });
-    console.log('✅ Creating Supabase client for auth verification...');
-    
     // Validiere Token via Supabase Auth mit explizitem Token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createAnonSupabaseClient();
     const tokenOnly = token.trim();
     
     const { data: { user }, error } = await supabase.auth.getUser(tokenOnly);
@@ -76,7 +40,7 @@ async function verifyRequest(req) {
     console.log('✅ USER AUTHENTICATED:', user.id);
     
     // Hole driver_id mit SERVICE KEY (nicht mit Auth Header)
-    const supabaseService = createClient(supabaseUrl, serviceKey);
+    const supabaseService = createServiceSupabaseClient();
     const { data: driver, error: driverError } = await supabaseService
       .from('drivers')
       .select('id')
@@ -102,13 +66,7 @@ async function verifyRequest(req) {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': 'https://desponexodriver.app',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    'Access-Control-Allow-Credentials': 'true',
-    'Content-Type': 'application/json'
-  };
+  const corsHeaders = getCorsHeaders({ methods: 'GET, POST, OPTIONS' });
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -153,7 +111,7 @@ Deno.serve(async (req) => {
     // 1. Prüfen ob Tour diesem Fahrer gehört UND compensation_rate + documentation_requirements + license_plate holen
     console.log('🔍 Checking tour:', { tour_id, driver_id });
     
-    const supabase = createClient(supabaseUrl, serviceKey);
+    const supabase = createServiceSupabaseClient();
     const { data: existingTour, error: tourCheckError } = await supabase
       .from('tours')
       .select('id, driver_id, status, compensation_rate, compensation_type, documentation_requirements, documentation_status, license_plate')

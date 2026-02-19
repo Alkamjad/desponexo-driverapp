@@ -1,15 +1,10 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import { getCorsHeaders } from './_shared/cors.ts';
 
 // CORS Headers - RESTRICTED
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://desponexodriver.app',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  'Access-Control-Allow-Credentials': 'true',
-  'Content-Type': 'application/json'
-};
+const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 
 // 🔐 Verify user is authenticated
 async function verifyRequest(req) {
