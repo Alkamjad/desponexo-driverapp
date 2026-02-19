@@ -1,6 +1,6 @@
 import supabase from '@/components/supabaseClient';
 
-const FUNCTIONS_BASE_URL = 'https://desponexodriver.app';
+const FUNCTIONS_BASE_URL = (import.meta.env.VITE_FUNCTIONS_BASE_URL || window.location.origin || '').replace(/\/$/, '');
 
 /**
  * ZENTRAL WRAPPER für alle Backend Function Calls
