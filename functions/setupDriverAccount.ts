@@ -1,5 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { getCorsHeaders } from './_shared/cors.ts';
 
+const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 const corsHeaders = {
   'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
