@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 // CORS Headers - RESTRICTED
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://desponexodriver.app',
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
   'Access-Control-Allow-Credentials': 'true',

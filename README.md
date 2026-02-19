@@ -55,6 +55,7 @@ Danach siehst du die Änderungen hier:
 Lege in deiner Hosting-Plattform folgende Variable an:
 
 - `VITE_FUNCTIONS_BASE_URL` (z. B. `https://desponexodriver.app`)
+- `ALLOWED_ORIGIN` (für Backend Functions CORS, z. B. `https://dein-projekt.vercel.app`)
 
 Wenn `VITE_FUNCTIONS_BASE_URL` nicht gesetzt ist, nutzt das Frontend automatisch die aktuelle Origin (`window.location.origin`).
 
