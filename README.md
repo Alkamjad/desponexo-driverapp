@@ -1,6 +1,5 @@
 Desponexo DriverApp
 
-## Schnellstart: Änderungen nach GitHub pushen
 
 Wenn du lokale Änderungen in GitHub sehen willst, nutze diese Schritte:
 
