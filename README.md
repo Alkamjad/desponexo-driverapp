@@ -50,3 +50,14 @@ Danach siehst du die Änderungen hier:
 
 - `https://github.com/Alkamjad/Driverapp/tree/workplace`
 - `https://github.com/Alkamjad/Driverapp/commits/workplace`
+
+## Frontend-ENV (Vercel/Preview/Production)
+
+Lege in deiner Hosting-Plattform folgende Variable an:
+
+- `VITE_FUNCTIONS_BASE_URL` (z. B. `https://desponexodriver.app`)
+- `ALLOWED_ORIGIN` (für Backend Functions CORS, z. B. `https://dein-projekt.vercel.app`)
+- `INTERNAL_FUNCTION_SECRET` (Backend-internes Secret für geschützte interne Function-Calls wie `sendPushNotification`)
+
+Wenn `VITE_FUNCTIONS_BASE_URL` nicht gesetzt ist, nutzt das Frontend automatisch die aktuelle Origin (`window.location.origin`).
+
