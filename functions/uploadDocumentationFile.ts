@@ -5,6 +5,13 @@ import { getCorsHeaders } from './_shared/cors.ts';
 
 // CORS Headers - RESTRICTED
 const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
+const corsHeaders = {
+  'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Credentials': 'true',
+  'Content-Type': 'application/json'
+};
 
 // 🔐 Verify user is authenticated
 async function verifyRequest(req) {
