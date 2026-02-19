@@ -55,6 +55,8 @@ Danach siehst du die Änderungen hier:
 Lege in deiner Hosting-Plattform folgende Variable an:
 
 - `VITE_FUNCTIONS_BASE_URL` (z. B. `https://desponexodriver.app`)
+- `VITE_SUPABASE_URL` (deine Supabase Projekt-URL)
+- `VITE_SUPABASE_ANON_KEY` (dein Supabase anon key)
 - `ALLOWED_ORIGIN` (für Backend Functions CORS, z. B. `https://dein-projekt.vercel.app`)
 - `INTERNAL_FUNCTION_SECRET` (Backend-internes Secret für geschützte interne Function-Calls wie `sendPushNotification`)
 
