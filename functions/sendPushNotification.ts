@@ -6,6 +6,7 @@
 import { initializeApp, cert } from 'npm:firebase-admin@13.0.2/app';
 import { getMessaging } from 'npm:firebase-admin@13.0.2/messaging';
 import { getCorsHeaders } from './_shared/cors.ts';
+import { verifyInternalRequest } from './_shared/internalAuth.ts';
 
 let firebaseApp = null;
 

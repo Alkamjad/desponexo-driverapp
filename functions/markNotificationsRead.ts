@@ -1,9 +1,42 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import { getCorsHeaders } from './_shared/cors.ts';
+import { createAnonSupabaseClient, createServiceSupabaseClient, hasRequiredSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
+
+async function verifyRequest(req: Request) {
+  try {
+    const authHeader = req.headers.get('Authorization') || '';
+    if (!authHeader.startsWith('Bearer ')) {
+      return { valid: false, status: 401, error: 'Missing or invalid Authorization header' };
+    }
+
+    if (!hasRequiredSupabaseEnv()) {
+      return { valid: false, status: 500, error: 'Server config missing' };
+    }
+
+    const token = authHeader.replace('Bearer ', '').trim();
+    const supabaseAuth = createAnonSupabaseClient();
+    const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
+    if (error || !user) {
+      return { valid: false, status: 401, error: 'Invalid or expired token' };
+    }
+
+    const supabaseService = createServiceSupabaseClient();
+    const { data: driver, error: driverError } = await supabaseService
+      .from('drivers')
+      .select('id, email')
+      .eq('user_id', user.id)
+      .single();
+
+    if (driverError || !driver) {
+      return { valid: false, status: 403, error: 'Driver not found' };
+    }
+
+    return { valid: true, driverId: driver.id, driverEmail: driver.email };
+  } catch (error) {
+    return { valid: false, status: 401, error: error.message };
+  }
+}
 
 const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 
@@ -60,7 +93,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Forbidden: driver mismatch' }, { status: 403, headers: corsHeaders });
     }
 
-    const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+    const supabase = createServiceSupabaseClient();
     const nowIso = new Date().toISOString();
 
     const { data, error } = await supabase

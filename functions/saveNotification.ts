@@ -1,26 +1,8 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import { getCorsHeaders } from './_shared/cors.ts';
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+import { verifyInternalRequest } from './_shared/internalAuth.ts';
+import { createServiceSupabaseClient, getSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
 const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
-
-function verifyInternalRequest(req: Request) {
-  const expectedSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
-
-  // Sichere Default-Strategie: ohne Secret keine Ausführung
-  if (!expectedSecret) {
-    return { valid: false, status: 500, error: 'INTERNAL_FUNCTION_SECRET missing' };
-  }
-
-  const requestSecret = req.headers.get('x-internal-secret') || '';
-  if (requestSecret !== expectedSecret) {
-    return { valid: false, status: 401, error: 'Unauthorized internal request' };
-  }
-
-  return { valid: true };
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -43,11 +25,17 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Missing required fields' }, { status: 400, headers: corsHeaders });
     }
 
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      return Response.json({ error: 'Server config missing' }, { status: 500, headers: corsHeaders });
+    const { url: supabaseUrl } = getSupabaseEnv();
+    if (!supabaseUrl) {
+      return Response.json({ error: 'SUPABASE_URL missing' }, { status: 500, headers: corsHeaders });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    let supabase;
+    try {
+      supabase = createServiceSupabaseClient();
+    } catch {
+      return Response.json({ error: 'Server config missing' }, { status: 500, headers: corsHeaders });
+    }
 
     // STRENGE DUPLIKAT-PRÜFUNG: Verhindere identische Benachrichtigungen in den letzten 60 Sekunden
     const sixtySecondsAgo = new Date(Date.now() - 60 * 1000).toISOString();
@@ -133,7 +121,7 @@ Deno.serve(async (req) => {
 
       if (driverData?.fcm_token) {
         // Sende Push via Firebase
-        const API_BASE_URL = Deno.env.get('DRIVER_APP_DOMAIN') || 'https://desponexodriver.app';
+        const API_BASE_URL = Deno.env.get('DRIVER_APP_DOMAIN') || supabaseUrl;
         await fetch(`${API_BASE_URL}/functions/sendPushNotification`, {
           method: 'POST',
           headers: {
