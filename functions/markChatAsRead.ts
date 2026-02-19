@@ -71,6 +71,13 @@ async function verifyRequest(req) {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': Deno.env.get('ALLOWED_ORIGIN') || '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    'Content-Type': 'application/json'
+  };
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
