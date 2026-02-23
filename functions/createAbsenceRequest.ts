@@ -1,5 +1,5 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 import { getCorsHeaders } from './_shared/cors.ts';
+import { createAnonSupabaseClient, createServiceSupabaseClient, hasRequiredSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
 const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 
@@ -10,19 +10,16 @@ async function requireUser(req) {
       return { valid: false, status: 401, error: 'Missing or invalid Authorization header' };
     }
     const token = authHeader.replace('Bearer ', '').trim();
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
+    if (!hasRequiredSupabaseEnv()) {
       return { valid: false, status: 500, error: 'Server config missing' };
     }
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createAnonSupabaseClient();
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       console.error('❌ AUTH ERROR:', error?.message);
       return { valid: false, status: 401, error: 'Invalid or expired token' };
     }
-    const supabaseService = createClient(supabaseUrl, serviceKey);
+    const supabaseService = createServiceSupabaseClient();
     const { data: driver, error: driverError } = await supabaseService
       .from('drivers')
       .select('id, company_id, email')
@@ -55,9 +52,6 @@ Deno.serve(async (req) => {
       return Response.json({ error: auth.error }, { status: auth.status, headers: corsHeaders });
     }
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
     const { 
       request_type, 
       requested_start_date, 
@@ -88,7 +82,7 @@ Deno.serve(async (req) => {
       }, { status: 400, headers: corsHeaders });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createServiceSupabaseClient();
 
     // Eintrag in absence_requests erstellen - nutze auth-Daten
     const { data, error } = await supabase
@@ -125,7 +119,10 @@ Deno.serve(async (req) => {
     try {
       await fetch(`${Deno.env.get('DRIVER_APP_DOMAIN')}/functions/saveNotification`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': Deno.env.get('INTERNAL_FUNCTION_SECRET') || ''
+        },
         body: JSON.stringify({
           driver_id: auth.driver_id,
           driver_email: auth.driver_email,

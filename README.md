@@ -64,3 +64,13 @@ Lege in deiner Hosting-Plattform folgende Variable an:
 Wenn `VITE_FUNCTIONS_BASE_URL` nicht gesetzt ist, nutzt das Frontend automatisch die aktuelle Origin (`window.location.origin`).
 Ohne `ALLOWED_ORIGIN` blocken die Functions Browser-CORS standardmäßig (fail-closed).
 
+
+## Vercel Quick-Fix bei weißer Seite
+
+Wenn im Browser `Missing Supabase config` erscheint, fehlen in Vercel die Variablen:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Zusätzlich braucht die App `public/manifest.json` für den Manifest-Request.
+Nach dem Setzen der Variablen bitte **Redeploy** ausführen.
