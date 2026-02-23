@@ -1,5 +1,6 @@
 // Aktualisiert den Status einer Abwesenheitsanfrage (Admin-Only)
-import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+import { getCorsHeaders } from './_shared/cors.ts';
+import { createAnonSupabaseClient, createServiceSupabaseClient, hasRequiredSupabaseEnv } from './_shared/supabaseAdmin.ts';
 
 async function verifyAdminRequest(req) {
   try {
@@ -11,17 +12,13 @@ async function verifyAdminRequest(req) {
     }
     
     const token = authHeader.replace('Bearer ', '');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
+    if (!hasRequiredSupabaseEnv()) {
       console.error('❌ ENV CONFIG MISSING');
       return { valid: false, status: 500 };
     }
     
     // Validiere Token via Supabase Auth
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createAnonSupabaseClient();
     const tokenOnly = token.trim();
     
     const { data: { user }, error } = await supabase.auth.getUser(tokenOnly);
@@ -34,7 +31,7 @@ async function verifyAdminRequest(req) {
     console.log('✅ USER AUTHENTICATED:', user.id);
     
     // Hole driver_id mit SERVICE KEY
-    const supabaseService = createClient(supabaseUrl, serviceKey);
+    const supabaseService = createServiceSupabaseClient();
     const { data: driver, error: driverError } = await supabaseService
       .from('drivers')
       .select('id, role')
@@ -60,13 +57,7 @@ async function verifyAdminRequest(req) {
   }
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://desponexodriver.app',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Allow-Credentials': 'true',
-  'Content-Type': 'application/json'
-};
+const corsHeaders = getCorsHeaders({ methods: 'POST, OPTIONS' });
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -89,8 +80,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const { absence_request_id, status, admin_notes } = await req.json();
 
     if (!absence_request_id || !status) {
@@ -101,7 +90,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'Status muss approved oder rejected sein' }, { status: 400 });
     }
 
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const supabase = createServiceSupabaseClient();
     
     console.log('✅ Updating absence request:', absence_request_id);
 
@@ -136,7 +125,10 @@ Deno.serve(async (req) => {
     try {
       await fetch(`${Deno.env.get('DRIVER_APP_DOMAIN')}/functions/saveNotification`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': Deno.env.get('INTERNAL_FUNCTION_SECRET') || ''
+        },
         body: JSON.stringify({
           driver_id: data.driver_id,
           driver_email: data.driver_email,
