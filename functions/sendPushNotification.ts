@@ -10,6 +10,22 @@ import { verifyInternalRequest } from './_shared/internalAuth.ts';
 
 let firebaseApp = null;
 
+function verifyInternalRequest(req: Request) {
+  const expectedSecret = Deno.env.get('INTERNAL_FUNCTION_SECRET');
+
+  // Wenn kein Secret gesetzt ist -> fail closed (sicherer Default)
+  if (!expectedSecret) {
+    return { valid: false, status: 500, error: 'INTERNAL_FUNCTION_SECRET missing' };
+  }
+
+  const requestSecret = req.headers.get('x-internal-secret') || '';
+  if (requestSecret !== expectedSecret) {
+    return { valid: false, status: 401, error: 'Unauthorized internal request' };
+  }
+
+  return { valid: true };
+}
+
 // Firebase Admin SDK initialisieren
 function getFirebaseApp() {
   if (firebaseApp) return firebaseApp;
