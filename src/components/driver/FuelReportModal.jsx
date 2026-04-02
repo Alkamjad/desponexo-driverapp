@@ -566,7 +566,7 @@ export default function FuelReportModal({ open, onClose, tour, onUpdate }) {
             </div>
 
             {/* Debug Info (nur im Entwicklungsmodus) */}
-            {process.env.NODE_ENV === 'development' && (
+            {import.meta.env.DEV && (
               <div className="mt-4 p-2 bg-slate-900/50 border border-slate-600 rounded text-xs">
                 <details>
                   <summary className="cursor-pointer text-slate-400">Debug Info</summary>

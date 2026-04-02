@@ -214,9 +214,10 @@ export default function TourDocumentationDialog({
 
     setIsUploading(true);
     const isOnline = navigator.onLine;
+    let documentationCompleted = {};
 
     try {
-      const documentationCompleted = {
+      documentationCompleted = {
         completed_at: new Date().toISOString()
       };
 

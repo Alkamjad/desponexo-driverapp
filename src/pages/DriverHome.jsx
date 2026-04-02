@@ -181,8 +181,8 @@ export default function DriverHome() {
 
 
 
-  const handleSyncComplete = (syncedTours) => {
-    setTours(syncedTours);
+  const handleSyncComplete = () => {
+    reloadTours();
   };
 
   if (isLoading) {
