@@ -1,6 +1,7 @@
 import supabase from '@/components/supabaseClient';
 
-const FUNCTIONS_BASE_URL = (import.meta.env.VITE_FUNCTIONS_BASE_URL || window.location.origin || '').replace(/\/$/, '');
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || window.location.origin;
+const FUNCTIONS_BASE_URL = `${SUPABASE_URL}/functions/v1`.replace(/\/$/, '');
 
 /**
  * ZENTRAL WRAPPER für alle Backend Function Calls
@@ -52,7 +53,7 @@ export const callFunction = async (functionName, payload = {}, options = {}) => 
     }
 
     // 4️⃣ API CALL mit vollständigen Headers
-    const response = await fetch(`${FUNCTIONS_BASE_URL}/functions/${functionName}`, {
+    const response = await fetch(`${FUNCTIONS_BASE_URL}/${functionName}`, {
       method: 'POST',
       headers: headers,
       body: isFormData ? payload : JSON.stringify(payload)
