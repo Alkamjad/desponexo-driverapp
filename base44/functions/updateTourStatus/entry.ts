@@ -56,7 +56,7 @@ async function verifyRequest(req) {
     console.log('✅ Creating Supabase client for auth verification...');
     
     // Validiere Token via Supabase Auth mit explizitem Token
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createClient(supabaseUrl, serviceKey);
     const tokenOnly = token.trim();
     
     const { data: { user }, error } = await supabase.auth.getUser(tokenOnly);

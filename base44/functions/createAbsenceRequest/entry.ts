@@ -23,7 +23,7 @@ async function requireUser(req) {
     if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
       return { valid: false, status: 500, error: 'Server config missing' };
     }
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const supabase = createClient(supabaseUrl, serviceKey);
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       console.error('❌ AUTH ERROR:', error?.message);
