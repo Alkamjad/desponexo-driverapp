@@ -39,7 +39,7 @@ class ErrorBoundary extends React.Component {
                 Ein unerwarteter Fehler ist aufgetreten. Bitte aktualisiere die Seite oder navigiere zur Startseite.
               </p>
               
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {this.state.error && (
                 <details className="mb-6 text-left">
                   <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300 mb-2">
                     Debug-Info

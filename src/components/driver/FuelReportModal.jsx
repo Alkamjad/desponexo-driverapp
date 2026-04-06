@@ -565,22 +565,7 @@ export default function FuelReportModal({ open, onClose, tour, onUpdate }) {
               </Button>
             </div>
 
-            {/* Debug Info (nur im Entwicklungsmodus) */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="mt-4 p-2 bg-slate-900/50 border border-slate-600 rounded text-xs">
-                <details>
-                  <summary className="cursor-pointer text-slate-400">Debug Info</summary>
-                  <pre className="mt-2 text-slate-400 overflow-auto">
-                    {JSON.stringify({
-                      tourId: tour.id,
-                      tourIdField: tour.tour_id,
-                      licensePlate: tour.license_plate,
-                      driverEmail: driverEmail
-                    }, null, 2)}
-                  </pre>
-                </details>
-              </div>
-            )}
+
           </div>
         )}
       </DialogContent>
