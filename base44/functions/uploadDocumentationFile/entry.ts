@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://desponexodriver.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+  'Access-Control-Allow-Headers': 'Authorization, Content-Type, x-supabase-auth, x-client-request-id',
   'Access-Control-Allow-Credentials': 'true',
   'Content-Type': 'application/json'
 };
@@ -12,13 +12,12 @@ const corsHeaders = {
 // 🔐 Verify user is authenticated
 async function verifyRequest(req) {
   try {
+    const supabaseToken = req.headers.get('x-supabase-auth');
     const authHeader = req.headers.get('Authorization') || '';
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { valid: false, status: 401, error: 'Missing or invalid Authorization header' };
+    const token = supabaseToken || (authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '').trim() : null);
+    if (!token) {
+      return { valid: false, status: 401, error: 'Missing auth token' };
     }
-    
-    const token = authHeader.replace('Bearer ', '').trim();
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');

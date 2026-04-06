@@ -3,16 +3,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 async function verifyRequest(req) {
   try {
+    const supabaseToken = req.headers.get('x-supabase-auth');
     const authHeader = req.headers.get('Authorization') || '';
-    console.log('AUTH prefix', authHeader.slice(0, 20));
-    console.log('AUTH token length', authHeader.startsWith('Bearer ') ? authHeader.slice(7).length : -1);
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('❌ NO BEARER TOKEN');
+    const token = supabaseToken || (authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '').trim() : null);
+    if (!token) {
+      console.error('❌ NO AUTH TOKEN');
       return { valid: false, status: 401 };
     }
-    
-    const token = authHeader.replace('Bearer ', '');
     
     // DEBUG JWT PAYLOAD (ohne Token zu leaken)
     try {
@@ -106,7 +103,7 @@ Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': 'https://desponexodriver.app',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-supabase-auth, x-client-request-id',
     'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };

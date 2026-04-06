@@ -4,14 +4,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 async function verifyAdminRequest(req) {
   try {
+    const supabaseToken = req.headers.get('x-supabase-auth');
     const authHeader = req.headers.get('Authorization') || '';
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('❌ NO BEARER TOKEN');
+    const token = supabaseToken || (authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '').trim() : null);
+    if (!token) {
+      console.error('❌ NO AUTH TOKEN');
       return { valid: false, status: 401 };
     }
-    
-    const token = authHeader.replace('Bearer ', '');
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -64,7 +63,7 @@ async function verifyAdminRequest(req) {
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://desponexodriver.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-supabase-auth, x-client-request-id',
   'Access-Control-Allow-Credentials': 'true',
   'Content-Type': 'application/json'
 };

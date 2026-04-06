@@ -43,6 +43,7 @@ export const callFunction = async (functionName, payload = {}, options = {}) => 
     
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
+      'x-supabase-auth': session.access_token,
       'x-client-request-id': requestId
     };
     
