@@ -55,4 +55,17 @@ export default [
       "react-hooks/rules-of-hooks": "error",
     },
   },
+  {
+    files: ["tailwind.config.js", "vite.config.js", "postcss.config.js"],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: "commonjs",
+      },
+    },
+    rules: {
+      "no-undef": "off",
+    },
+  },
 ];

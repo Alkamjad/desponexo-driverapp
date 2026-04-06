@@ -1,7 +1,16 @@
 import supabase from '@/components/supabaseClient';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || window.location.origin;
-const FUNCTIONS_BASE_URL = `${SUPABASE_URL}/functions/v1`.replace(/\/$/, '');
+const getSupabaseFunctionsUrl = () => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (!supabaseUrl) {
+    console.error('[callFunction] VITE_SUPABASE_URL nicht gesetzt!');
+    return '/functions/v1';
+  }
+  // Extrahiere die Basis-URL und füge /functions/v1 hinzu
+  return `${supabaseUrl}/functions/v1`.replace(/\/$/, '');
+};
+
+const FUNCTIONS_BASE_URL = getSupabaseFunctionsUrl();
 
 /**
  * ZENTRAL WRAPPER für alle Backend Function Calls
@@ -53,7 +62,10 @@ export const callFunction = async (functionName, payload = {}, options = {}) => 
     }
 
     // 4️⃣ API CALL mit vollständigen Headers
-    const response = await fetch(`${FUNCTIONS_BASE_URL}/${functionName}`, {
+    const url = `${FUNCTIONS_BASE_URL}/${functionName}`;
+    console.log(`[callFunction] Rufe auf: ${url}`);
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: headers,
       body: isFormData ? payload : JSON.stringify(payload)
