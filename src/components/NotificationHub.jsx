@@ -150,7 +150,7 @@ export default function NotificationHub() {
     const notificationHash = `${type}-${sourceData?.id || JSON.stringify(sourceData)}`;
 
     try {
-      const API_BASE_URL = 'https://desponexodriver.app';
+      const API_BASE_URL = window.location.origin;
       await fetch(`${API_BASE_URL}/functions/saveNotification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

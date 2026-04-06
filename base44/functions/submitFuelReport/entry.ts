@@ -78,9 +78,9 @@ Deno.serve(async (req) => {
     // VALIDIERUNG
     const errors = [];
     if (!tour_id) errors.push('tour_id fehlt');
-    if (!liters || liters <= 0) errors.push('Liter ungültig');
-    if (!amount || amount <= 0) errors.push('Betrag ungültig');
-    if (!mileage || mileage <= 0) errors.push('KM-Stand ungültig');
+    if (!liters || parseFloat(liters) <= 0) errors.push('Liter ungültig');
+    if (!amount || parseFloat(amount) <= 0) errors.push('Betrag ungültig');
+    if (!mileage || parseInt(mileage) <= 0) errors.push('KM-Stand ungültig');
     if (!vehicle_confirmed) errors.push('Fahrzeug nicht bestätigt');
 
     if (errors.length > 0) {

@@ -177,7 +177,7 @@ export default function FuelReportModal({ open, onClose, tour, onUpdate }) {
     if (!formData.mileage || parseInt(formData.mileage) <= 0) {
       errors.push(t('fuel_error_km'));
     }
-    // Beleg ist jetzt OPTIONAL - nicht mehr Pflichtfeld
+    // Fahrzeug muss bestätigt sein
     if (!formData.vehicle_confirmed) {
       errors.push(t('fuel_error_confirm'));
     }
@@ -245,7 +245,8 @@ export default function FuelReportModal({ open, onClose, tour, onUpdate }) {
       }
     } catch (error) {
       console.error('Submit Fehler:', error);
-      toast.error(t('fuel_error_connection'));
+      const errorMsg = error?.message || error?.details || t('fuel_error_connection');
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
