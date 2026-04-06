@@ -119,11 +119,6 @@ export default function Dashboard() {
     let chatChannel = null;
 
     const setup = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) {
-        await supabase.realtime.setAuth(session.access_token);
-      }
-
       chatChannel = supabase
         .channel('dashboard_chat_badge')
         .on('postgres_changes',
@@ -152,7 +147,7 @@ export default function Dashboard() {
 
     setup();
     return () => { if (chatChannel) supabase.removeChannel(chatChannel); };
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     checkAuthAndLoadData();

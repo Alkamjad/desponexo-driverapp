@@ -126,20 +126,12 @@ export default function NotificationHub() {
     return unsub;
   }, []);
 
-  const driverIdRef = useRef(driver?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null));
-  const driverEmailRef = useRef(driver?.email || (typeof window !== 'undefined' ? localStorage.getItem('driver_email') : null));
+  const driverId = driver?.id || (typeof window !== 'undefined' ? localStorage.getItem('driver_id') : null);
+  const driverEmail = driver?.email || (typeof window !== 'undefined' ? localStorage.getItem('driver_email') : null);
 
-  useEffect(() => {
-    driverIdRef.current = driver?.id || localStorage.getItem('driver_id');
-    driverEmailRef.current = driver?.email || localStorage.getItem('driver_email');
-  }, [driver]);
-
-  const driverId = driverIdRef.current;
-  const driverEmail = driverEmailRef.current;
-
-  // saveNotification - stable callback
+  // saveNotification
   const saveNotification = useCallback(async (type, title, message, sourceData) => {
-    if (!driverIdRef.current || !isInitialLoadDoneRef.current) return;
+    if (!driverId || !isInitialLoadDoneRef.current) return;
 
     const getSourceId = (obj) => obj?.id || obj?.tour_id || obj?.payment_id || obj?.report_id || obj?.message_id || obj?.absence_request_id;
     const alreadyExists = notificationsRef.current.some(n =>
@@ -150,13 +142,13 @@ export default function NotificationHub() {
     const notificationHash = `${type}-${sourceData?.id || JSON.stringify(sourceData)}`;
 
     try {
-      const API_BASE_URL = window.location.origin;
+      const API_BASE_URL = 'https://desponexodriver.app';
       await fetch(`${API_BASE_URL}/functions/saveNotification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          driver_id: driverIdRef.current,
-          driver_email: driverEmailRef.current,
+          driver_id: driverId,
+          driver_email: driverEmail,
           type, title, message,
           source_data: sourceData,
           notification_hash: notificationHash
@@ -165,16 +157,14 @@ export default function NotificationHub() {
     } catch (error) {
       console.error('Error saving notification:', error);
     }
-  }, []);
+  }, [driverId, driverEmail]);
 
   // === MASTER EFFECT: Load + Realtime + Producers ===
   useEffect(() => {
-    if (!user || !driverIdRef.current || engineRunning) return;
+    if (!user || !driverId || engineRunning) return;
     engineRunning = true;
 
     const allChannels = [];
-    const currentDriverId = driverIdRef.current;
-    const currentDriverEmail = driverEmailRef.current;
 
     const init = async () => {
       // 1. Auth-Token für Realtime setzen
@@ -190,7 +180,7 @@ export default function NotificationHub() {
         const { data, error } = await supabase
           .from('driver_notifications')
           .select('*')
-          .eq('driver_id', currentDriverId)
+          .eq('driver_id', driverId)
           .eq('read', false)
           .order('created_at', { ascending: false });
 
@@ -206,9 +196,9 @@ export default function NotificationHub() {
 
       // 3. Realtime für driver_notifications INSERT
       const notifChannel = supabase
-        .channel(`notif_master_${currentDriverId}`)
+        .channel(`notif_master_${driverId}`)
         .on('postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'driver_notifications', filter: `driver_id=eq.${currentDriverId}` },
+          { event: 'INSERT', schema: 'public', table: 'driver_notifications', filter: `driver_id=eq.${driverId}` },
           (payload) => {
             const notification = payload.new;
             if (!notification) return;
@@ -246,8 +236,8 @@ export default function NotificationHub() {
 
       // Tours
       const tourCh = supabase
-        .channel(`prod_tours_${currentDriverId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tours', filter: `driver_id=eq.${currentDriverId}` },
+        .channel(`prod_tours_${driverId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'tours', filter: `driver_id=eq.${driverId}` },
           (payload) => {
             const { eventType, new: tour, old: oldTour } = payload;
             if (eventType === 'INSERT') {
@@ -270,8 +260,8 @@ export default function NotificationHub() {
 
       // Payments
       const payCh = supabase
-        .channel(`prod_pay_${currentDriverId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'driver_payments', filter: `driver_email=eq.${currentDriverEmail}` },
+        .channel(`prod_pay_${driverId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'driver_payments', filter: `driver_email=eq.${driverEmail}` },
           (payload) => {
             const p = payload.new;
             if (!isEventsReady) { initialIds.payments.add(p.id); return; }
@@ -281,9 +271,9 @@ export default function NotificationHub() {
       allChannels.push(payCh);
 
       // Chat
-      if (company_id && currentDriverEmail) {
+      if (company_id && driverEmail) {
         const chatCh = supabase
-          .channel(`prod_chat_${company_id}_${currentDriverId}`)
+          .channel(`prod_chat_${company_id}_${driverId}`)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `company_id=eq.${company_id}` },
             (payload) => {
               const m = payload.new;
@@ -298,8 +288,8 @@ export default function NotificationHub() {
 
       // Fuel Reports
       const fuelCh = supabase
-        .channel(`prod_fuel_${currentDriverId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_reports', filter: `driver_email=eq.${currentDriverEmail}` },
+        .channel(`prod_fuel_${driverId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'fuel_reports', filter: `driver_email=eq.${driverEmail}` },
           (payload) => {
             const { eventType, new: r } = payload;
             if (eventType === 'INSERT') {
@@ -314,8 +304,8 @@ export default function NotificationHub() {
 
       // Documents
       const docCh = supabase
-        .channel(`prod_docs_${currentDriverId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'driver_documents', filter: `driver_email=eq.${currentDriverEmail}` },
+        .channel(`prod_docs_${driverId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'driver_documents', filter: `driver_email=eq.${driverEmail}` },
           (payload) => {
             const d = payload.new;
             if (!isEventsReady) { initialIds.docs.add(d.id); return; }
@@ -326,8 +316,8 @@ export default function NotificationHub() {
 
       // Violations
       const violCh = supabase
-        .channel(`prod_viol_${currentDriverId}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'traffic_violations', filter: `driver_email=eq.${currentDriverEmail}` },
+        .channel(`prod_viol_${driverId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'traffic_violations', filter: `driver_email=eq.${driverEmail}` },
           (payload) => {
             const v = payload.new;
             if (!isEventsReady) { initialIds.violations.add(v.id); return; }
@@ -349,7 +339,7 @@ export default function NotificationHub() {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
       channelsRef.current = [];
     };
-  }, [user, saveNotification]);
+  }, [user, driverId, driverEmail, saveNotification]);
 
   return null;
 }
