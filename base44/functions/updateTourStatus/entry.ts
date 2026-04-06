@@ -1,5 +1,23 @@
-import { getCorsHeaders } from './_shared/cors.ts';
-import { createAnonSupabaseClient, createServiceSupabaseClient, hasRequiredSupabaseEnv } from './_shared/supabaseAdmin.ts';
+import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Content-Type': 'application/json'
+};
+
+function createServiceSupabaseClient() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  return createClient(url, serviceRoleKey);
+}
+
+function createAnonSupabaseClient() {
+  const url = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  return createClient(url, anonKey);
+}
 
 async function verifyRequest(req) {
   try {
@@ -9,32 +27,18 @@ async function verifyRequest(req) {
       return { valid: false, status: 401 };
     }
     
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.replace('Bearer ', '').trim();
     
-    if (!hasRequiredSupabaseEnv()) {
-      console.error('❌ ENV CONFIG MISSING');
-      return { valid: false, status: 500 };
-    }
-    
-    // Validiere Token via Supabase Auth mit explizitem Token
     const supabase = createAnonSupabaseClient();
-    const tokenOnly = token.trim();
+    const { data: { user }, error } = await supabase.auth.getUser(token);
     
-    const { data: { user }, error } = await supabase.auth.getUser(tokenOnly);
-    
-    if (error) {
-      console.error('❌ AUTH ERROR:', error.message);
-      return { valid: false, status: 401 };
-    }
-    
-    if (!user) {
-      console.error('❌ NO USER FOUND');
+    if (error || !user) {
+      console.error('❌ AUTH ERROR:', error?.message);
       return { valid: false, status: 401 };
     }
     
     console.log('✅ USER AUTHENTICATED:', user.id);
     
-    // Hole driver_id mit SERVICE KEY (nicht mit Auth Header)
     const supabaseService = createServiceSupabaseClient();
     const { data: driver, error: driverError } = await supabaseService
       .from('drivers')
@@ -42,13 +46,8 @@ async function verifyRequest(req) {
       .eq('user_id', user.id)
       .single();
     
-    if (driverError) {
-      console.error('❌ DRIVER ERROR:', driverError.message);
-      return { valid: false, status: 403 };
-    }
-    
-    if (!driver) {
-      console.error('❌ NO DRIVER FOUND FOR USER');
+    if (driverError || !driver) {
+      console.error('❌ DRIVER ERROR:', driverError?.message);
       return { valid: false, status: 403 };
     }
     
@@ -61,8 +60,6 @@ async function verifyRequest(req) {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders({ methods: 'GET, POST, OPTIONS' });
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
   }
@@ -86,21 +83,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Nutze driver_id AUS TOKEN, nicht aus Body
     const driver_id = auth.driver_id;
-
-    if (!hasRequiredSupabaseEnv()) {
-      console.error('❌ ENV CONFIG MISSING IN MAIN');
-      return new Response(
-        JSON.stringify({ success: false, error: 'Server-Konfiguration fehlt' }),
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    // 1. Prüfen ob Tour diesem Fahrer gehört UND compensation_rate + documentation_requirements + license_plate holen
-    console.log('🔍 Checking tour:', { tour_id, driver_id });
-    
     const supabase = createServiceSupabaseClient();
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+    // 1. Tour prüfen - Tabelle heißt "tours"
+    console.log('🔍 Checking tour in tours table:', { tour_id, driver_id });
+    
     const { data: existingTour, error: tourCheckError } = await supabase
       .from('tours')
       .select('id, driver_id, status, compensation_rate, compensation_type, documentation_requirements, documentation_status, license_plate')
@@ -108,37 +98,31 @@ Deno.serve(async (req) => {
       .eq('driver_id', driver_id)
       .single();
 
-    console.log('📋 Tour check result:', existingTour);
+    console.log('📋 Tour check result:', existingTour, 'Error:', tourCheckError);
     
     if (tourCheckError || !existingTour) {
-      console.error('❌ Tour not found:', { tour_id, driver_id });
+      console.error('❌ Tour not found:', { tour_id, driver_id, error: tourCheckError });
       return new Response(
         JSON.stringify({ success: false, error: 'Tour nicht gefunden oder nicht autorisiert' }),
         { status: 403, headers: corsHeaders }
       );
     }
-     const currentStatus = existingTour.status;
 
+    const currentStatus = existingTour.status;
 
-
-    // 3. STATUS-STATE-MACHINE: Erlaubte Übergänge definieren
+    // 2. STATUS-STATE-MACHINE
     const ALLOWED_TRANSITIONS = {
       'assigned': ['confirmed'],
       'confirmed': ['picked_up'],
       'picked_up': ['delivered'],
       'delivered': ['completed'],
-      'completed': [] // Terminal state - keine weiteren Übergänge
+      'completed': []
     };
 
-    // 4. Validiere Status-Übergang
     const allowedNextStates = ALLOWED_TRANSITIONS[currentStatus] || [];
     
     if (!allowedNextStates.includes(status)) {
-      console.error('❌ Invalid status transition:', { 
-        current: currentStatus, 
-        requested: status,
-        allowed: allowedNextStates 
-      });
+      console.error('❌ Invalid status transition:', { current: currentStatus, requested: status });
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -152,126 +136,58 @@ Deno.serve(async (req) => {
       );
     }
 
-    // STATUS-MACHINE: delivered_final wird nur via Admin/Company-Dashboard gesetzt
-    // Drivers dürfen max. 'delivered' setzen
-
     const now = new Date().toISOString();
+    const updateData = { status, updated_at: now };
 
-    // Update-Daten vorbereiten
-    const updateData = {
-      status: status,
-      updated_at: now
-    };
-
-    // Zeitstempel je nach Status setzen
     if (status === 'confirmed') updateData.confirmed_at = now;
     if (status === 'in_progress') updateData.started_at = now;
+    
     if (status === 'picked_up') {
       updateData.picked_up_at = now;
       updateData.started_at = now;
-      updateData.gps_tracking_active = true;  // GPS-Tracking aktivieren für Hauptapp
+      updateData.gps_tracking_active = true;
       
-      // 🔴 DOKUMENTATIONS-STATUS INITIALISIERUNG
-      // Wenn documentation_requirements existiert → setze status auf 'pending'
       if (existingTour.documentation_requirements && 
           (!existingTour.documentation_status || existingTour.documentation_status === 'not_required')) {
         updateData.documentation_status = 'pending';
-        console.log('📋 Dokumentation erforderlich - setze status auf pending');
       }
       
-      // 🚗 DRIVER STATUS UPDATE: Setze auf 'unterwegs'
+      // Driver Status updaten
       try {
-        console.log('🚗 Updating driver status to unterwegs');
-        await fetch(
-          `${supabaseUrl}/rest/v1/drivers?id=eq.${driver_id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'apikey': serviceKey,
-              'Authorization': `Bearer ${serviceKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              status: 'unterwegs',
-              updated_at: now
-            })
-          }
-        );
-        console.log('✅ Driver status updated to unterwegs');
-      } catch (driverError) {
-        console.warn('⚠️ Failed to update driver status:', driverError);
-      }
+        await fetch(`${supabaseUrl}/rest/v1/drivers?id=eq.${driver_id}`, {
+          method: 'PATCH',
+          headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'unterwegs', updated_at: now })
+        });
+      } catch (e) { console.warn('⚠️ Failed to update driver status:', e); }
       
-      // 🚚 VEHICLE STATUS UPDATE: Über license_plate
+      // Vehicle Status updaten
       if (existingTour.license_plate) {
         try {
-          console.log('🚚 Updating vehicle status to unterwegs for license plate:', existingTour.license_plate);
-          const vehicleUpdateResponse = await fetch(
-            `${supabaseUrl}/rest/v1/vehicles?license_plate=eq.${existingTour.license_plate}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'apikey': serviceKey,
-                'Authorization': `Bearer ${serviceKey}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                status: 'unterwegs',
-                updated_at: now
-              })
-            }
-          );
-          
-          if (vehicleUpdateResponse.ok) {
-            console.log('✅ Vehicle status updated to unterwegs');
-          } else {
-            const errorText = await vehicleUpdateResponse.text();
-            console.error('❌ Failed to update vehicle status:', errorText);
-          }
-        } catch (vehicleError) {
-          console.error('⚠️ Failed to update vehicle status:', vehicleError);
-        }
+          await fetch(`${supabaseUrl}/rest/v1/vehicles?license_plate=eq.${existingTour.license_plate}`, {
+            method: 'PATCH',
+            headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'unterwegs', updated_at: now })
+          });
+        } catch (e) { console.warn('⚠️ Failed to update vehicle status:', e); }
       }
       
-      // Bei picked_up: Fuel Report Status von 'gesperrt' zu 'freigegeben' ändern
+      // Fuel Report freigeben
       try {
-        console.log('⛽ Updating fuel report status to freigegeben');
-        await fetch(
-          `${supabaseUrl}/rest/v1/fuel_reports?tour_id=eq.${tour_id}&driver_id=eq.${driver_id}`,
-          {
-            method: 'PATCH',
-            headers: {
-              'apikey': serviceKey,
-              'Authorization': `Bearer ${serviceKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              status: 'freigegeben',
-              updated_at: now
-            })
-          }
-        );
-        console.log('✅ Fuel report status updated');
-      } catch (fuelError) {
-        console.warn('⚠️ Failed to update fuel report:', fuelError);
-      }
+        await fetch(`${supabaseUrl}/rest/v1/fuel_reports?tour_id=eq.${tour_id}&driver_id=eq.${driver_id}`, {
+          method: 'PATCH',
+          headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'freigegeben', updated_at: now })
+        });
+      } catch (e) { console.warn('⚠️ Failed to update fuel report:', e); }
     }
+    
     if (status === 'delivered') {
-      // 🔴 KRITISCHER CHECK: Dokumentation erforderlich?
       const needsDocumentation = existingTour.documentation_requirements && 
                                  Object.keys(existingTour.documentation_requirements).length > 0;
       const documentationPending = existingTour.documentation_status === 'pending';
       
-      console.log('📋 Dokumentations-Check:', {
-        needsDocumentation,
-        documentation_status: existingTour.documentation_status,
-        has_documentation_completed: !!documentation_completed,
-        will_block: needsDocumentation && documentationPending && !documentation_completed
-      });
-      
-      // BLOCKIEREN wenn Doku erforderlich aber nicht hochgeladen
       if (needsDocumentation && documentationPending && !documentation_completed) {
-        console.error('❌ BLOCKIERT: Dokumentation muss hochgeladen werden!');
         return new Response(
           JSON.stringify({ 
             success: false, 
@@ -285,127 +201,56 @@ Deno.serve(async (req) => {
       
       updateData.delivered_at = now;
       
-      // Stückvergütung: pieces_delivered und calculated_compensation
       if (pieces_delivered !== undefined) {
         const pieces = parseInt(pieces_delivered) || 0;
         updateData.pieces_delivered = pieces;
-        
-        // Berechne Vergütung wenn compensation_rate vorhanden
         if (existingTour.compensation_rate && existingTour.compensation_type === 'stück') {
           updateData.calculated_compensation = pieces * existingTour.compensation_rate;
-          console.log('💰 Calculated compensation:', {
-            pieces,
-            rate: existingTour.compensation_rate,
-            total: updateData.calculated_compensation
-          });
         }
       }
       
-      // Dokumentation
       if (documentation_completed) {
         updateData.documentation_completed = documentation_completed;
-        updateData.documentation_status = 'completed'; // Status IMMER auf completed setzen
-        console.log('✅ Dokumentation hochgeladen - Status: completed');
+        updateData.documentation_status = 'completed';
       }
-      if (documentation_status) {
-        updateData.documentation_status = documentation_status;
-      }
-      
+      if (documentation_status) updateData.documentation_status = documentation_status;
       if (signature_url) updateData.signature_url = signature_url;
       if (photo_url) updateData.photo_url = photo_url;
       if (notes) updateData.notes = notes;
 
-      // 🚗 DRIVER STATUS UPDATE: Prüfe ob noch andere aktive Touren existieren
+      // Driver/Vehicle Status nach Lieferung
       try {
-        console.log('🔍 Checking for other active tours');
-        
-        // Zähle andere aktive Touren
         const activeToursResponse = await fetch(
-          `${supabaseUrl}/rest/v1/tours?driver_id=eq.${driver_id}&status=in.("assigned","confirmed","picked_up","in_transit")&select=id`,
-          {
-            headers: {
-              'apikey': serviceKey,
-              'Authorization': `Bearer ${serviceKey}`
-            }
-          }
+          `${supabaseUrl}/rest/v1/tours?driver_id=eq.${driver_id}&status=in.(assigned,confirmed,picked_up,in_progress)&select=id`,
+          { headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` } }
         );
-
         if (activeToursResponse.ok) {
           const activeTours = await activeToursResponse.json();
-          const activeCount = activeTours?.length || 0;
+          const newDriverStatus = (activeTours?.length || 0) === 0 ? 'verfügbar' : 'unterwegs';
           
-          console.log(`📊 Active tours count: ${activeCount}`);
+          await fetch(`${supabaseUrl}/rest/v1/drivers?id=eq.${driver_id}`, {
+            method: 'PATCH',
+            headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newDriverStatus, updated_at: now })
+          });
           
-          // Nur auf verfügbar setzen wenn keine anderen aktiven Touren
-          const newDriverStatus = activeCount === 0 ? 'verfügbar' : 'unterwegs';
-          
-          console.log(`🚗 Setting driver status to: ${newDriverStatus}`);
-          
-          await fetch(
-            `${supabaseUrl}/rest/v1/drivers?id=eq.${driver_id}`,
-            {
-              method: 'PATCH',
-              headers: {
-                'apikey': serviceKey,
-                'Authorization': `Bearer ${serviceKey}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({
-                status: newDriverStatus,
-                updated_at: now
-              })
-            }
-          );
-          
-          console.log(`✅ Driver status updated to ${newDriverStatus}`);
-          
-          // 🚚 VEHICLE STATUS UPDATE: Über license_plate zurücksetzen
           if (existingTour.license_plate) {
-            const newVehicleStatus = activeCount === 0 ? 'verfügbar' : 'unterwegs';
-            console.log(`🚚 Setting vehicle status to: ${newVehicleStatus} for license plate:`, existingTour.license_plate);
-            
-            const vehicleUpdateResponse = await fetch(
-              `${supabaseUrl}/rest/v1/vehicles?license_plate=eq.${existingTour.license_plate}`,
-              {
-                method: 'PATCH',
-                headers: {
-                  'apikey': serviceKey,
-                  'Authorization': `Bearer ${serviceKey}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                  status: newVehicleStatus,
-                  updated_at: now
-                })
-              }
-            );
-            
-            if (vehicleUpdateResponse.ok) {
-              console.log(`✅ Vehicle status updated to ${newVehicleStatus}`);
-            } else {
-              const errorText = await vehicleUpdateResponse.text();
-              console.error('❌ Failed to update vehicle status on delivery:', errorText);
-            }
+            await fetch(`${supabaseUrl}/rest/v1/vehicles?license_plate=eq.${existingTour.license_plate}`, {
+              method: 'PATCH',
+              headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: newDriverStatus, updated_at: now })
+            });
           }
         }
-      } catch (driverError) {
-        console.warn('⚠️ Failed to update driver status:', driverError);
-      }
+      } catch (e) { console.warn('⚠️ Failed to update driver/vehicle status:', e); }
     }
+    
     if (status === 'cancelled') updateData.cancelled_at = now;
-    if (status === 'failed') updateData.failed_at = now;
-
-    // GPS-Location speichern wenn vorhanden
     if (location) updateData.current_location = location;
 
-    console.log('🔄 Updating tour:', tour_id, 'Status:', status, 'Data:', updateData);
-    console.log('📦 Pieces info:', {
-      pieces_delivered,
-      compensation_type: existingTour.compensation_type,
-      compensation_rate: existingTour.compensation_rate
-    });
+    console.log('🔄 Updating tour:', tour_id, 'Status:', status);
 
-    // 6. ATOMARES UPDATE: Nur wenn status noch der erwartete ist (Race Condition Protection)
+    // Atomares Update auf "tours" Tabelle
     const { data: updatedTours, error: updateError } = await supabase
       .from('tours')
       .update(updateData)
@@ -414,16 +259,14 @@ Deno.serve(async (req) => {
       .select();
 
     if (updateError) {
-      console.error('Supabase update failed:', updateError);
+      console.error('❌ Supabase update failed:', updateError);
       return new Response(
-        JSON.stringify({ success: false, error: 'Internal server error' }),
+        JSON.stringify({ success: false, error: 'Internal server error', details: updateError.message }),
         { status: 500, headers: corsHeaders }
       );
     }
     
-    // 7. Prüfe ob Update erfolgreich (0 rows = Status hat sich zwischenzeitlich geändert)
     if (!Array.isArray(updatedTours) || updatedTours.length === 0) {
-      console.error('❌ Status conflict: Tour status changed during update');
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -435,57 +278,35 @@ Deno.serve(async (req) => {
     }
 
     const updatedTour = updatedTours[0];
+    console.log('✅ Tour updated successfully:', updatedTour.id);
 
-    console.log('✅ Tour updated:', updatedTour);
-
-    // Tour-Update in tour_updates Tabelle protokollieren
+    // Update-Log in tour_updates
     try {
-      const updateLog = {
-        assignment_id: tour_id,
-        driver_id: driver_id,
-        tour_id: updatedTour.tour_id,
-        status: status,
-        update_type: 'status_update',
-        location: location || null,
-        notes: notes || null,
-        signature_url: signature_url || null,
-        update_data: {
-          status,
-          location,
-          pieces_delivered,
-          signature_url,
-          photo_url,
-          notes,
-          timestamp: now
+      await fetch(`${supabaseUrl}/rest/v1/tour_updates`, {
+        method: 'POST',
+        headers: {
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
         },
-        created_at: now
-      };
-
-      console.log('📝 Creating tour update log:', updateLog);
-
-      await fetch(
-        `${supabaseUrl}/rest/v1/tour_updates`,
-        {
-          method: 'POST',
-          headers: {
-            'apikey': serviceKey,
-            'Authorization': `Bearer ${serviceKey}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(updateLog)
-        }
-      );
-    } catch (logError) {
-      console.warn('⚠️ Failed to log tour update:', logError);
-    }
+        body: JSON.stringify({
+          assignment_id: tour_id,
+          driver_id,
+          tour_id: updatedTour.tour_id,
+          status,
+          update_type: 'status_update',
+          location: location || null,
+          notes: notes || null,
+          signature_url: signature_url || null,
+          update_data: { status, location, pieces_delivered, signature_url, photo_url, notes, timestamp: now },
+          created_at: now
+        })
+      });
+    } catch (e) { console.warn('⚠️ Failed to log tour update:', e); }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Status aktualisiert',
-        tour: updatedTour
-      }),
+      JSON.stringify({ success: true, message: 'Status aktualisiert', tour: updatedTour }),
       { status: 200, headers: corsHeaders }
     );
 
