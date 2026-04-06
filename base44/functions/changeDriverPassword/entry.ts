@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+// deployed
 
 async function requireUser(req) {
   try {
