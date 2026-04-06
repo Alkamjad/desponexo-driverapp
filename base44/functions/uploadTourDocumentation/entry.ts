@@ -1,5 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
-import { getCorsHeaders } from './_shared/cors.ts';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Content-Type': 'application/json'
+};
 
 async function verifyRequest(req) {
   try {
@@ -72,7 +78,6 @@ async function verifyRequest(req) {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders({ methods: 'GET, POST, OPTIONS' });
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
