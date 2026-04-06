@@ -13,10 +13,26 @@ async function requireUser(req) {
   try {
     const supabaseToken = req.headers.get('x-supabase-auth');
     const authHeader = req.headers.get('Authorization') || '';
+    
+    console.log('🔍 AUTH DEBUG:', {
+      has_x_supabase_auth: !!supabaseToken,
+      x_supabase_auth_length: supabaseToken?.length || 0,
+      x_supabase_auth_prefix: supabaseToken?.substring(0, 20) || 'NONE',
+      has_authorization: !!authHeader,
+      authorization_prefix: authHeader?.substring(0, 30) || 'NONE',
+      all_headers: Object.fromEntries([...req.headers.entries()].filter(([k]) => k.startsWith('x-') || k === 'authorization'))
+    });
+    
     const token = supabaseToken || (authHeader.startsWith('Bearer ') ? authHeader.replace('Bearer ', '').trim() : null);
     if (!token) {
       return { valid: false, status: 401, error: 'Missing auth token' };
     }
+    
+    console.log('🔑 TOKEN DEBUG:', {
+      token_length: token.length,
+      token_prefix: token.substring(0, 20),
+      token_source: supabaseToken ? 'x-supabase-auth' : 'Authorization'
+    });
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
