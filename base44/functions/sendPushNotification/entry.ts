@@ -1,6 +1,7 @@
 /**
  * SEND PUSH NOTIFICATION
  * Sendet Push Notifications an Fahrer-Geräte via Firebase Cloud Messaging
+ * deploy v2
  */
 
 import { initializeApp, cert } from 'npm:firebase-admin@13.0.2/app';

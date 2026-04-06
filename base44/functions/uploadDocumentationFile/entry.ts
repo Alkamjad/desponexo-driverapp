@@ -1,7 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
-
 // CORS Headers - RESTRICTED
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://desponexodriver.app',

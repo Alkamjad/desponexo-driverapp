@@ -1,4 +1,5 @@
 // Aktualisiert den Status einer Abwesenheitsanfrage (Admin-Only)
+// deploy v2
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 async function verifyAdminRequest(req) {
