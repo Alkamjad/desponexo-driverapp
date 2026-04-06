@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
+// deploy trigger
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': 'https://desponexodriver.app',
