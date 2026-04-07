@@ -30,7 +30,6 @@ export default function TourDetails() {
   const [gpsActive, setGpsActive] = useState(false);
   const [piecesModalOpen, setPiecesModalOpen] = useState(false);
   const [documentationDialogOpen, setDocumentationDialogOpen] = useState(false);
-  const [arrivedAtCustomer, setArrivedAtCustomer] = useState(false);
   const [problemModalOpen, setProblemModalOpen] = useState(false);
 
   const tourId = new URLSearchParams(window.location.search).get('id');
@@ -83,9 +82,9 @@ export default function TourDetails() {
     };
   }, [tourId]);
 
-  // GPS aktivieren wenn Tour abgeholt wurde
+  // GPS aktivieren wenn Tour abgeholt oder beim Kunden
   useEffect(() => {
-    if (tour && ['picked_up', 'in_transit'].includes(tour.status)) {
+    if (tour && ['picked_up', 'in_transit', 'arrived_at_customer'].includes(tour.status)) {
       setGpsActive(true);
     } else {
       setGpsActive(false);
@@ -195,6 +194,7 @@ export default function TourDetails() {
     switch (status) {
       case 'confirmed': return t('tour_confirmed');
       case 'picked_up': return t('tour_picked_up');
+      case 'arrived_at_customer': return 'Beim Kunden angekommen!';
       case 'delivered': return t('tour_delivered');
       default: return t('tour_status_updated');
     }
@@ -213,15 +213,18 @@ export default function TourDetails() {
       return;
     }
 
-    const hasDocRequirements = tour.documentation_requirements && 
-                               Object.keys(tour.documentation_requirements).length > 0;
-    
-    const needsDocumentation = hasDocRequirements && 
-                               tour.documentation_status === 'pending';
-    
-    if (needsDocumentation) {
-      setDocumentationDialogOpen(true);
-      return;
+    // Für Nicht-Multi-Stop: Doku-Check nur wenn noch pending
+    // (Bei arrived_at_customer könnte Nachweis bereits hochgeladen sein)
+    if (!tour.is_multi_stop) {
+      const hasDocRequirements = tour.documentation_requirements && 
+                                 Object.keys(tour.documentation_requirements).length > 0;
+      const needsDocumentation = hasDocRequirements && 
+                                 tour.documentation_status === 'pending';
+      
+      if (needsDocumentation) {
+        setDocumentationDialogOpen(true);
+        return;
+      }
     }
 
     // Bei Stückvergütung: Zeige Input-Modal
@@ -314,6 +317,7 @@ export default function TourDetails() {
       assigned: { label: t('status_assigned'), color: 'bg-yellow-500', textColor: 'text-yellow-300' },
       confirmed: { label: t('status_confirmed'), color: 'bg-purple-500', textColor: 'text-purple-300' },
       picked_up: { label: t('status_picked_up'), color: 'bg-orange-500', textColor: 'text-orange-300' },
+      arrived_at_customer: { label: 'Beim Kunden', color: 'bg-blue-500', textColor: 'text-blue-300' },
       in_transit: { label: t('status_in_transit'), color: 'bg-cyan-500', textColor: 'text-cyan-300' },
       delivered: { label: t('status_delivered'), color: 'bg-green-500', textColor: 'text-green-300' },
       completed: { label: t('status_completed'), color: 'bg-emerald-500', textColor: 'text-emerald-300' },
@@ -363,8 +367,8 @@ export default function TourDetails() {
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Notizen - Wichtig für Fahrer (bei picked_up/in_transit für Nicht-Multi-Stop, sonst immer) */}
-        {tour.notes && (tour.is_multi_stop || ['picked_up', 'in_transit', 'assigned'].includes(tour.status)) && (
+        {/* Notizen - Wichtig für Fahrer */}
+        {tour.notes && (tour.is_multi_stop || ['picked_up', 'in_transit', 'arrived_at_customer', 'assigned'].includes(tour.status)) && (
           <Card className="border-0 shadow-lg bg-amber-900/20 border-amber-500/30">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
@@ -381,7 +385,7 @@ export default function TourDetails() {
         )}
 
         {/* Tankvorgang & Problem melden - Buttons nebeneinander */}
-        {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && (
+        {!isFuture && ['picked_up', 'in_transit', 'arrived_at_customer'].includes(tour.status) && (
           <div className="flex gap-2">
             <FuelReportButton tour={tour} onUpdate={loadTour} />
             <Button
@@ -583,8 +587,54 @@ export default function TourDetails() {
             </>
           );
 
-          // === PICKED_UP / IN_TRANSIT: Kundenadresse + Hinweise ===
-          if (['picked_up', 'in_transit'].includes(status)) return (
+          // === PICKED_UP: Kundenadresse + Hinweise ===
+          if (status === 'picked_up') return (
+            <>
+              {tour.delivery_address && (
+                <Card className="border-0 shadow-lg bg-blue-900/20 border-blue-500/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-blue-400 text-xs mb-1 font-bold">KUNDENADRESSE</p>
+                        <p className="text-white font-medium">{tour.delivery_address}</p>
+                        {tour.delivery_postal_code && tour.delivery_city && (
+                          <p className="text-slate-400 text-sm">{tour.delivery_postal_code} {tour.delivery_city}</p>
+                        )}
+                        {tour.delivery_contact && (
+                          <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3" /> {tour.delivery_contact}
+                          </p>
+                        )}
+                        {tour.delivery_phone && (
+                          <Button variant="ghost" size="sm" className="text-blue-400 p-0 h-auto mt-1" onClick={() => callPhone(tour.delivery_phone)}>
+                            <Phone className="w-3 h-3 mr-1" /> {tour.delivery_phone}
+                          </Button>
+                        )}
+                      </div>
+                      <Button size="icon" className="bg-blue-600 hover:bg-blue-700" onClick={() => openNavigation(tour.delivery_address)}>
+                        <Navigation className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {tour.scheduled_delivery_from && (
+                      <div className="mt-3 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <span className="text-blue-300 text-sm font-medium">
+                          Lieferung: {moment(tour.scheduled_delivery_from).format('HH:mm')} Uhr
+                          {tour.scheduled_delivery_to && ` - ${moment(tour.scheduled_delivery_to).format('HH:mm')} Uhr`}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+
+          // === ARRIVED_AT_CUSTOMER: Kundenadresse (bereits da) + Hinweise ===
+          if (status === 'arrived_at_customer') return (
             <>
               {tour.delivery_address && (
                 <Card className="border-0 shadow-lg bg-blue-900/20 border-blue-500/30">
@@ -675,45 +725,42 @@ export default function TourDetails() {
 
 
 
-          {/* Schritt 3: Beim Kunden angekommen + Nachweis + Ausgeliefert (NICHT Multi-Stop) */}
-          {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && !tour.is_multi_stop && (
+          {/* Schritt 3: Beim Kunden angekommen (NICHT Multi-Stop) */}
+          {!isFuture && tour.status === 'picked_up' && !tour.is_multi_stop && (
+            <Button 
+              className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-semibold"
+              onClick={() => updateStatus('arrived_at_customer')}
+              disabled={isUpdating}
+            >
+              {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <MapPin className="w-5 h-5 mr-2" />}
+              Beim Kunden angekommen
+            </Button>
+          )}
+
+          {/* Schritt 4: Nachweis + Ausgeliefert (NICHT Multi-Stop, nach arrived_at_customer) */}
+          {!isFuture && tour.status === 'arrived_at_customer' && !tour.is_multi_stop && (
             <>
-              {!arrivedAtCustomer ? (
-                /* Schritt 3a: "Beim Kunden angekommen" Button */
+              {/* Nachweis hochladen - falls Dokumentation erforderlich */}
+              {tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0 && tour.documentation_status === 'pending' && (
                 <Button 
-                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-semibold"
-                  onClick={() => setArrivedAtCustomer(true)}
+                  className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-lg font-semibold"
+                  onClick={() => setDocumentationDialogOpen(true)}
                   disabled={isUpdating}
                 >
-                  <MapPin className="w-5 h-5 mr-2" />
-                  Beim Kunden angekommen
+                  {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
+                  Nachweis hochladen
                 </Button>
-              ) : (
-                /* Schritt 3b: Nach Ankunft → Nachweis hochladen (falls nötig) + Ausgeliefert */
-                <>
-                  {/* Nachweis hochladen - falls Dokumentation erforderlich */}
-                  {tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0 && tour.documentation_status === 'pending' ? (
-                    <Button 
-                      className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-lg font-semibold"
-                      onClick={() => setDocumentationDialogOpen(true)}
-                      disabled={isUpdating}
-                    >
-                      {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
-                      Nachweis hochladen
-                    </Button>
-                  ) : null}
-
-                  {/* Ausgeliefert Button */}
-                  <Button 
-                    className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
-                    onClick={handleDeliver}
-                    disabled={isUpdating}
-                  >
-                    {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
-                    {t('tours_deliver')}
-                  </Button>
-                </>
               )}
+
+              {/* Ausgeliefert Button */}
+              <Button 
+                className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
+                onClick={handleDeliver}
+                disabled={isUpdating}
+              >
+                {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
+                {t('tours_deliver')}
+              </Button>
             </>
           )}
 

@@ -17,7 +17,10 @@ export const useMyToursRealtime = (driverId) => {
     let displayStatus = tour.status;
     let statusMessage = '';
 
-    if (tour.status === 'delivered' && !tour.approved_at) {
+    if (tour.status === 'arrived_at_customer') {
+      displayStatus = 'arrived_at_customer';
+      statusMessage = '📍 Beim Kunden';
+    } else if (tour.status === 'delivered' && !tour.approved_at) {
       displayStatus = 'awaiting_approval';
       statusMessage = '⏳ Wartet auf Abrechnung';
     } else if (tour.status === 'completed' && tour.approved_at) {

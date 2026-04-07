@@ -176,7 +176,8 @@ Deno.serve(async (req) => {
     const ALLOWED_TRANSITIONS = {
       'assigned': ['confirmed'],
       'confirmed': ['picked_up'],
-      'picked_up': ['delivered'],
+      'picked_up': ['arrived_at_customer'],
+      'arrived_at_customer': ['delivered'],
       'delivered': ['completed'],
       'completed': [] // Terminal state - keine weiteren Übergänge
     };
@@ -217,6 +218,11 @@ Deno.serve(async (req) => {
     // Zeitstempel je nach Status setzen
     if (status === 'confirmed') updateData.confirmed_at = now;
     if (status === 'in_progress') updateData.started_at = now;
+    if (status === 'arrived_at_customer') {
+      updateData.arrived_at_customer_at = now;
+      updateData.gps_tracking_active = true; // GPS bleibt aktiv
+      if (location) updateData.current_location = location;
+    }
     if (status === 'picked_up') {
       updateData.picked_up_at = now;
       updateData.started_at = now;
@@ -311,6 +317,7 @@ Deno.serve(async (req) => {
       // 🔴 KRITISCHER CHECK: Dokumentation erforderlich?
       const needsDocumentation = existingTour.documentation_requirements && 
                                  Object.keys(existingTour.documentation_requirements).length > 0;
+      // Dokumentation kann pending ODER completed sein (wenn bei arrived_at_customer hochgeladen)
       const documentationPending = existingTour.documentation_status === 'pending';
       
       console.log('📋 Dokumentations-Check:', {
