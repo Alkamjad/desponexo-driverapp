@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
       .from('drivers')
       .select('id, email, full_name, company_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
     
     if (driverByUserId) {
       driver = driverByUserId;
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
         .from('drivers')
         .select('id, email, full_name, company_id')
         .eq('email', user.email)
-        .single();
+        .maybeSingle();
       driver = driverByEmail;
     }
 
