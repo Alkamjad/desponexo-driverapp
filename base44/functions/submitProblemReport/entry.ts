@@ -1,10 +1,11 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('Origin') || '*';
   const corsHeaders = {
-    'Access-Control-Allow-Origin': 'https://desponexodriver.app',
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-supabase-auth, x-client-request-id',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-supabase-auth, x-client-request-id, apikey',
     'Access-Control-Allow-Credentials': 'true',
     'Content-Type': 'application/json'
   };
@@ -32,14 +33,28 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
-    // Get driver
-    const { data: driver, error: driverError } = await supabase
+    // Get driver - try user_id first, fallback to email
+    let driver = null;
+    
+    const { data: driverByUserId } = await supabase
       .from('drivers')
       .select('id, email, full_name, company_id')
       .eq('user_id', user.id)
       .single();
+    
+    if (driverByUserId) {
+      driver = driverByUserId;
+    } else if (user.email) {
+      const { data: driverByEmail } = await supabase
+        .from('drivers')
+        .select('id, email, full_name, company_id')
+        .eq('email', user.email)
+        .single();
+      driver = driverByEmail;
+    }
 
-    if (driverError || !driver) {
+    if (!driver) {
+      console.error('Driver not found for user:', user.id, user.email);
       return Response.json({ success: false, error: 'Driver not found' }, { status: 403, headers: corsHeaders });
     }
 
