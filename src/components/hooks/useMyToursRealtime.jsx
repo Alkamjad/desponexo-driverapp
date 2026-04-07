@@ -116,19 +116,23 @@ export const useMyToursRealtime = (driverId) => {
           (payload) => {
             if (payload.new.driver_id !== driverId) return;
 
-            const enhanced = enhanceTour(payload.new);
-
+            // Merge: Supabase Realtime liefert evtl. nur geänderte Spalten
+            // Daher bestehenden Tour-Eintrag mit neuen Daten mergen
             setTours(function(prev) {
               var exists = prev.some(function(t) {
-                return t.id === enhanced.id || t.tour_id === enhanced.tour_id;
+                return t.id === payload.new.id || t.tour_id === payload.new.tour_id;
               });
 
               if (exists) {
                 return prev.map(function(t) {
-                  return (t.id === enhanced.id || t.tour_id === enhanced.tour_id) ? enhanced : t;
+                  if (t.id === payload.new.id || t.tour_id === payload.new.tour_id) {
+                    var merged = Object.assign({}, t, payload.new);
+                    return enhanceTour(merged);
+                  }
+                  return t;
                 });
               }
-              return [enhanced].concat(prev);
+              return [enhanceTour(payload.new)].concat(prev);
             });
           }
         )

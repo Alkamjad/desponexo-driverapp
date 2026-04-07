@@ -18,6 +18,7 @@ import MultiStopList from "@/components/driver/MultiStopList";
 import PiecesInputModal from "@/components/driver/PiecesInputModal";
 import FuelReportButton from "@/components/driver/FuelReportButton";
 import TourDocumentationDialog from "@/components/driver/TourDocumentationDialog";
+import StopProblemModal from "@/components/driver/StopProblemModal";
 import supabaseClient from "@/components/supabaseClient";
 import moment from "moment";
 
@@ -29,6 +30,7 @@ export default function TourDetails() {
   const [gpsActive, setGpsActive] = useState(false);
   const [piecesModalOpen, setPiecesModalOpen] = useState(false);
   const [documentationDialogOpen, setDocumentationDialogOpen] = useState(false);
+  const [problemModalOpen, setProblemModalOpen] = useState(false);
 
   const tourId = new URLSearchParams(window.location.search).get('id');
   const driverId = localStorage.getItem("driver_id");
@@ -44,6 +46,40 @@ export default function TourDetails() {
     } else {
       navigate(createPageUrl('DriverHome'));
     }
+  }, [tourId]);
+
+  // Realtime-Listener für automatische Tour-Updates (completed, cancelled etc.)
+  useEffect(() => {
+    if (!tourId) return;
+
+    const setupRealtime = async () => {
+      try {
+        const { data: sessionData } = await supabaseClient.auth.getSession();
+        if (sessionData?.session?.access_token) {
+          await supabaseClient.realtime.setAuth(sessionData.session.access_token);
+        }
+      } catch (e) {
+        console.warn('[TourDetails] Auth-Token für Realtime fehlgeschlagen:', e);
+      }
+    };
+    setupRealtime();
+
+    const channel = supabaseClient
+      .channel(`tour_detail_${tourId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'tours',
+        filter: `id=eq.${tourId}`
+      }, (payload) => {
+        setTour(prev => prev ? { ...prev, ...payload.new } : payload.new);
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+      supabaseClient.removeChannel(channel);
+    };
   }, [tourId]);
 
   // GPS aktivieren wenn Tour abgeholt wurde
@@ -351,6 +387,7 @@ export default function TourDetails() {
               size="sm"
               variant="outline"
               className="flex-1 border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 text-xs px-3 py-1.5"
+              onClick={() => setProblemModalOpen(true)}
             >
               Problem für die Tour melden
             </Button>
@@ -669,6 +706,33 @@ export default function TourDetails() {
           onSubmit={handleDocumentationSubmit}
           requirements={tour.documentation_requirements}
           tourId={tourId}
+        />
+
+        {/* Problem melden Modal */}
+        <StopProblemModal
+          open={problemModalOpen}
+          onClose={() => setProblemModalOpen(false)}
+          onSubmit={async (problemData) => {
+            setProblemModalOpen(false);
+            try {
+              const data = await callFunction('updateTourStatus', {
+                tour_id: tourId,
+                driver_id: driverId,
+                status: 'problem_reported',
+                problem_type: problemData.reason,
+                problem_details: problemData.details
+              });
+              if (data?.success) {
+                toast.success('Problem wurde gemeldet');
+                await loadTour();
+              } else {
+                toast.error(data?.error || 'Fehler beim Melden');
+              }
+            } catch (error) {
+              toast.error('Verbindungsfehler');
+            }
+          }}
+          stop={{ customer_name: tour.client_name || tour.customer_name, address: tour.pickup_address || tour.delivery_address }}
         />
         </div>
         </div>
