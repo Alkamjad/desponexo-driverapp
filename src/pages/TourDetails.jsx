@@ -738,31 +738,39 @@ export default function TourDetails() {
           )}
 
           {/* Schritt 4: Nachweis + Ausgeliefert (NICHT Multi-Stop, nach arrived_at_customer) */}
-          {!isFuture && tour.status === 'arrived_at_customer' && !tour.is_multi_stop && (
-            <>
-              {/* Nachweis hochladen - falls Dokumentation erforderlich */}
-              {tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0 && tour.documentation_status === 'pending' && (
-                <Button 
-                  className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-lg font-semibold"
-                  onClick={() => setDocumentationDialogOpen(true)}
-                  disabled={isUpdating}
-                >
-                  {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
-                  Nachweis hochladen
-                </Button>
-              )}
+          {!isFuture && tour.status === 'arrived_at_customer' && !tour.is_multi_stop && (() => {
+            const hasDocRequirements = tour.documentation_requirements && 
+                                       Object.keys(tour.documentation_requirements).length > 0;
+            const docPending = hasDocRequirements && tour.documentation_status === 'pending';
 
-              {/* Ausgeliefert Button */}
-              <Button 
-                className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
-                onClick={handleDeliver}
-                disabled={isUpdating}
-              >
-                {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
-                {t('tours_deliver')}
-              </Button>
-            </>
-          )}
+            return (
+              <>
+                {/* Nur Nachweis-Button wenn Doku-Pflicht und noch nicht erledigt */}
+                {docPending && (
+                  <Button 
+                    className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-lg font-semibold"
+                    onClick={() => setDocumentationDialogOpen(true)}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
+                    Nachweis hochladen
+                  </Button>
+                )}
+
+                {/* Ausgeliefert Button NUR wenn keine Doku-Pflicht ODER Doku bereits erledigt */}
+                {!docPending && (
+                  <Button 
+                    className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
+                    onClick={handleDeliver}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
+                    {t('tours_deliver')}
+                  </Button>
+                )}
+              </>
+            );
+          })()}
 
           {/* Multi-Stop: Ausgeliefert wenn alle Stops fertig */}
           {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && tour.is_multi_stop && allStopsCompleted && (
