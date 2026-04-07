@@ -33,6 +33,14 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: 'Unauthorized' }, { status: 401, headers: corsHeaders });
     }
 
+    // Parse body early (needed for fallback driver_id)
+    const body = await req.json();
+    const { tour_id, problem_type, beschreibung, foto_url, driver_id: bodyDriverId } = body;
+
+    if (!problem_type || !beschreibung) {
+      return Response.json({ success: false, error: 'Missing required fields: problem_type, beschreibung' }, { status: 400, headers: corsHeaders });
+    }
+
     // Get driver - try user_id first, fallback to email
     let driver = null;
     
@@ -66,13 +74,6 @@ Deno.serve(async (req) => {
     if (!driver) {
       console.error('Driver not found for user:', user.id, user.email);
       return Response.json({ success: false, error: 'Driver not found' }, { status: 403, headers: corsHeaders });
-    }
-
-    const body = await req.json();
-    const { tour_id, problem_type, beschreibung, foto_url, driver_id: bodyDriverId } = body;
-
-    if (!problem_type || !beschreibung) {
-      return Response.json({ success: false, error: 'Missing required fields: problem_type, beschreibung' }, { status: 400, headers: corsHeaders });
     }
 
     // Validate problem_type against DB constraint
