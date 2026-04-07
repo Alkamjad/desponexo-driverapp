@@ -864,16 +864,13 @@ export default function TourDetails() {
           onSubmit={async (problemData) => {
             setProblemModalOpen(false);
             try {
-              const data = await callFunction('updateTourStatus', {
-                tour_id: tourId,
-                driver_id: driverId,
-                status: 'problem_reported',
-                problem_type: problemData.reason,
-                problem_details: problemData.details
+              const data = await callFunction('submitProblemReport', {
+                tour_id: tour.tour_id || tourId,
+                problem_type: problemData.reason || 'sonstiges',
+                beschreibung: problemData.details || problemData.reason || 'Problem gemeldet'
               });
               if (data?.success) {
                 toast.success('Problem wurde gemeldet');
-                await loadTour();
               } else {
                 toast.error(data?.error || 'Fehler beim Melden');
               }

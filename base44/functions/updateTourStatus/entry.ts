@@ -174,10 +174,10 @@ Deno.serve(async (req) => {
 
     // 3. STATUS-STATE-MACHINE: Erlaubte Übergänge definieren
     const ALLOWED_TRANSITIONS = {
-      'assigned': ['confirmed', 'problem_reported'],
-      'confirmed': ['picked_up', 'problem_reported'],
-      'picked_up': ['arrived_at_customer', 'problem_reported'],
-      'arrived_at_customer': ['delivered', 'problem_reported'],
+      'assigned': ['confirmed'],
+      'confirmed': ['picked_up'],
+      'picked_up': ['arrived_at_customer'],
+      'arrived_at_customer': ['delivered'],
       'delivered': ['completed'],
       'completed': [] // Terminal state - keine weiteren Übergänge
     };

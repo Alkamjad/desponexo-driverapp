@@ -56,7 +56,7 @@ export default [
     },
   },
   {
-    files: ["**/tailwind.config.js", "**/vite.config.js", "**/postcss.config.js"],
+    files: ["**/tailwind.config.js", "**/vite.config.js", "**/postcss.config.js", "src/tailwind.config.js", "src/vite.config.js", "src/postcss.config.js"],
     languageOptions: {
       globals: globals.node,
       parserOptions: {
