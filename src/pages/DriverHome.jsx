@@ -112,7 +112,7 @@ export default function DriverHome() {
     }
 
     // 🔥 KRITISCH: Touren die bereits bestätigt/abgeholt wurden IMMER anzeigen (unabhängig vom Datum)
-    const isInProgress = ['confirmed', 'picked_up', 'in_transit', 'delivered'].includes(status);
+    const isInProgress = ['confirmed', 'picked_up', 'in_transit', 'arrived_at_customer', 'delivered'].includes(status);
     if (isInProgress) {
       return true; // Zeige immer, egal ob Datum in Vergangenheit liegt
     }

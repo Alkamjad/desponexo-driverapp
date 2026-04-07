@@ -260,16 +260,24 @@ export default function NotificationHub() {
             // Wenn status vorhanden ist, prüfe auf cancelled/completed
             if (tour.status) {
               const cancelled = ['cancelled', 'canceled', 'storniert', 'abgebrochen', 'abgesagt'];
-              if (cancelled.includes(tour.status.toLowerCase())) {
+              const isCompleted = tour.status.toLowerCase() === 'completed';
+              const isCancelled = cancelled.includes(tour.status.toLowerCase());
+              
+              if (isCancelled || isCompleted) {
                 // Hole volle Tour-Daten für die Notification-Message
                 let tourTitle = tour.pickup_address || tour.tour_title || 'Tour';
                 if (!tour.pickup_address && tour.id) {
                   try {
-                    const { data: fullTour } = await supabase.from('tours').select('pickup_address, tour_title').eq('id', tour.id).single();
+                    const { data: fullTour } = await supabase.from('tours').select('pickup_address, tour_title, final_compensation').eq('id', tour.id).single();
                     if (fullTour) tourTitle = fullTour.pickup_address || fullTour.tour_title || 'Tour';
                   } catch (_) {}
                 }
-                saveNotification('tour_cancelled', 'Tour storniert', tourTitle, tour);
+                
+                if (isCancelled) {
+                  saveNotification('tour_cancelled', 'Tour storniert', tourTitle, tour);
+                } else if (isCompleted) {
+                  saveNotification('tour_completed', 'Tour abgerechnet', tourTitle, tour);
+                }
               }
             }
             
