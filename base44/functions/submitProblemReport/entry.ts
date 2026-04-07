@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     
     const { data: driverByUserId } = await supabase
       .from('drivers')
-      .select('id, email, full_name, company_id')
+      .select('id, email, first_name, last_name, company_id')
       .eq('user_id', user.id)
       .maybeSingle();
     
@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     } else if (user.email) {
       const { data: driverByEmail } = await supabase
         .from('drivers')
-        .select('id, email, full_name, company_id')
+        .select('id, email, first_name, last_name, company_id')
         .eq('email', user.email)
         .maybeSingle();
       driver = driverByEmail;
@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     if (!driver && bodyDriverId) {
       const { data: driverById } = await supabase
         .from('drivers')
-        .select('id, email, full_name, company_id')
+        .select('id, email, first_name, last_name, company_id')
         .eq('id', bodyDriverId)
         .maybeSingle();
       driver = driverById;
@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
     const mappedType = validTypes.includes(problem_type) ? problem_type : 'sonstiges';
 
     const now = new Date().toISOString();
+    const driverName = `${driver.first_name} ${driver.last_name}`.trim();
 
     // Insert into problem_reports
     const { data: report, error: insertError } = await supabase
@@ -94,7 +95,7 @@ Deno.serve(async (req) => {
         tour_id: tour_id || null,
         driver_id: driver.id,
         driver_email: driver.email,
-        driver_name: driver.full_name,
+        driver_name: driverName,
         problem_type: mappedType,
         beschreibung: beschreibung,
         foto_url: foto_url || null,
