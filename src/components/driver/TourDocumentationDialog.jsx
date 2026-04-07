@@ -45,6 +45,23 @@ export default function TourDocumentationDialog({
   tourId,
   stopNumber = null // Für Multi-Stop Dokumentation
 }) {
+  // Normalisiere photo_requirements: Strings → Objekte mit type/label/required
+  const normalizedRequirements = requirements ? {
+    ...requirements,
+    photo_requirements: requirements.photo_requirements?.map((req, idx) => {
+      if (typeof req === 'string') {
+        // String → Objekt: "Ware mit Hausnummer" → { type: "photo_0", label: "Ware mit Hausnummer", required: true }
+        return { type: `photo_${idx}`, label: req, required: true };
+      }
+      // Bereits ein Objekt — sicherstellen dass label existiert
+      return { 
+        type: req.type || `photo_${idx}`, 
+        label: req.label || PHOTO_TYPES[req.type] || `Foto ${idx + 1}`, 
+        required: req.required !== false 
+      };
+    })
+  } : null;
+
   // Signature State
   const [signatureName, setSignatureName] = useState("");
   const [signatureData, setSignatureData] = useState(null);
@@ -68,21 +85,21 @@ export default function TourDocumentationDialog({
 
   // Validierung
   const isValid = () => {
-    if (!requirements) return false;
+    if (!normalizedRequirements) return false;
     
-    if (requirements.signature_required && (!signatureData || !signatureName.trim())) {
+    if (normalizedRequirements.signature_required && (!signatureData || !signatureName.trim())) {
       return false;
     }
 
-    if (requirements.photo_requirements?.length > 0) {
-      for (const req of requirements.photo_requirements) {
+    if (normalizedRequirements.photo_requirements?.length > 0) {
+      for (const req of normalizedRequirements.photo_requirements) {
         if (req.required && !photos[req.type]) {
           return false;
         }
       }
     }
 
-    if (requirements.condition_report_required) {
+    if (normalizedRequirements.condition_report_required) {
       if (!condition) return false;
       if (condition === 'beschaedigt' && !damagePhoto) return false;
     }
@@ -91,18 +108,18 @@ export default function TourDocumentationDialog({
   };
 
   const getProgress = () => {
-    if (!requirements) return { completed: 0, total: 0 };
+    if (!normalizedRequirements) return { completed: 0, total: 0 };
     
     let completed = 0;
     let total = 0;
 
-    if (requirements.signature_required) {
+    if (normalizedRequirements.signature_required) {
       total++;
       if (signatureData && signatureName.trim()) completed++;
     }
 
-    if (requirements.photo_requirements?.length > 0) {
-      requirements.photo_requirements.forEach(req => {
+    if (normalizedRequirements.photo_requirements?.length > 0) {
+      normalizedRequirements.photo_requirements.forEach(req => {
         if (req.required) {
           total++;
           if (photos[req.type]) completed++;
@@ -110,7 +127,7 @@ export default function TourDocumentationDialog({
       });
     }
 
-    if (requirements.condition_report_required) {
+    if (normalizedRequirements.condition_report_required) {
       total++;
       if (condition && (condition !== 'beschaedigt' || damagePhoto)) completed++;
     }
@@ -222,7 +239,7 @@ export default function TourDocumentationDialog({
       };
 
       // 1. Signature - Online Upload oder Offline als DataURL
-      if (requirements.signature_required && signatureData) {
+      if (normalizedRequirements.signature_required && signatureData) {
         setUploadProgress("Unterschrift wird erfasst...");
 
         if (!isOnline) {
@@ -247,10 +264,10 @@ export default function TourDocumentationDialog({
       }
 
       // 2. Photos - Online Upload oder Offline als DataURL
-      if (requirements.photo_requirements?.length > 0) {
+      if (normalizedRequirements.photo_requirements?.length > 0) {
         documentationCompleted.photos = [];
 
-        for (const req of requirements.photo_requirements) {
+        for (const req of normalizedRequirements.photo_requirements) {
           if (photos[req.type]) {
             setUploadProgress(`${req.label} wird erfasst...`);
 
@@ -278,7 +295,7 @@ export default function TourDocumentationDialog({
       }
 
       // 3. Condition Report
-      if (requirements.condition_report_required && condition) {
+      if (normalizedRequirements.condition_report_required && condition) {
         documentationCompleted.condition_report = {
           status: condition,
           timestamp: new Date().toISOString()
@@ -372,7 +389,7 @@ export default function TourDocumentationDialog({
     onClose();
   };
 
-  if (!requirements || Object.keys(requirements).length === 0) {
+  if (!normalizedRequirements || Object.keys(normalizedRequirements).length === 0) {
     return null;
   }
 
@@ -410,7 +427,7 @@ export default function TourDocumentationDialog({
 
         <div className="space-y-4 sm:space-y-5 mt-6">
            {/* 1. Digitale Unterschrift */}
-           {requirements.signature_required && (
+           {normalizedRequirements.signature_required && (
              <div className="space-y-4 bg-slate-800/30 rounded-2xl p-4 sm:p-6 border border-slate-700/30 backdrop-blur-sm">
                <Label className="text-sm sm:text-base font-bold text-white flex items-center gap-3">
                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-blue-500/40 to-blue-600/30 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -466,7 +483,7 @@ export default function TourDocumentationDialog({
            />
 
           {/* 2. Fotos */}
-          {requirements.photo_requirements?.map((req) => (
+          {normalizedRequirements.photo_requirements?.map((req) => (
             <div key={req.type} className="space-y-4 bg-slate-800/30 rounded-2xl p-4 sm:p-6 border border-slate-700/30 backdrop-blur-sm">
               <Label className="text-sm sm:text-base font-bold text-white flex items-center gap-3">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-cyan-500/40 to-cyan-600/30 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -522,7 +539,7 @@ export default function TourDocumentationDialog({
           ))}
 
           {/* 3. Zustandsbericht */}
-          {requirements.condition_report_required && (
+          {normalizedRequirements.condition_report_required && (
             <div className="space-y-4 bg-slate-800/30 rounded-2xl p-4 sm:p-6 border border-slate-700/30 backdrop-blur-sm">
               <Label className="text-sm sm:text-base font-bold text-white flex items-center gap-3">
                 <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-purple-500/40 to-purple-600/30 rounded-lg flex items-center justify-center flex-shrink-0">
