@@ -112,12 +112,19 @@ export const useMyToursRealtime = (driverId) => {
         )
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'tours' },
+          { event: 'UPDATE', schema: 'public', table: 'tours', filter: `driver_id=eq.${driverId}` },
           (payload) => {
-            if (payload.new.driver_id !== driverId) return;
+            console.log('[useMyToursRealtime] UPDATE event received:', { id: payload.new.id, status: payload.new.status });
 
-            // Merge: Supabase Realtime liefert evtl. nur geänderte Spalten
-            // Daher bestehenden Tour-Eintrag mit neuen Daten mergen
+            // Wenn nur wenige Felder im payload → einfach komplett neu laden
+            // Supabase Realtime ohne REPLICA IDENTITY FULL liefert nur geänderte Spalten
+            const payloadKeys = Object.keys(payload.new || {});
+            if (payloadKeys.length < 5) {
+              console.log('[useMyToursRealtime] Partial payload detected, reloading all tours');
+              loadInitialTours();
+              return;
+            }
+
             setTours(function(prev) {
               var exists = prev.some(function(t) {
                 return t.id === payload.new.id || t.tour_id === payload.new.tour_id;

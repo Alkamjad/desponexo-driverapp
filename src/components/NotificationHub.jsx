@@ -234,29 +234,58 @@ export default function NotificationHub() {
         if (dd) company_id = JSON.parse(dd).company_id;
       } catch (_) {}
 
-      // Tours
-      const tourCh = supabase
-        .channel(`prod_tours_${driverId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'tours', filter: `driver_id=eq.${driverId}` },
+      // Tours - Lausche auf INSERT und UPDATE separat für bessere Zuverlässigkeit
+      const tourInsertCh = supabase
+        .channel(`prod_tours_insert_${driverId}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tours', filter: `driver_id=eq.${driverId}` },
           (payload) => {
-            const { eventType, new: tour, old: oldTour } = payload;
-            if (eventType === 'INSERT') {
-              if (!isEventsReady) { initialIds.tours.add(tour.id); return; }
-              if (!initialIds.tours.has(tour.id)) {
-                saveNotification('tour', 'Neue Tour zugewiesen', tour.pickup_address || tour.tour_title || 'Neue Tour', tour);
-              }
-            } else if (eventType === 'UPDATE' && isEventsReady) {
-              const cancelled = ['cancelled', 'canceled', 'storniert', 'abgebrochen', 'abgesagt'];
-              if (cancelled.includes(tour.status?.toLowerCase())) {
-                saveNotification('tour_cancelled', 'Tour storniert', tour.pickup_address || 'Tour', tour);
-              }
-              if (tour.approved_at && !oldTour?.approved_at) {
-                saveNotification('tour_approved', 'Tour genehmigt', tour.pickup_address || 'Tour', tour);
-              }
+            const tour = payload.new;
+            if (!isEventsReady) { initialIds.tours.add(tour.id); return; }
+            if (!initialIds.tours.has(tour.id)) {
+              saveNotification('tour', 'Neue Tour zugewiesen', tour.pickup_address || tour.tour_title || 'Neue Tour', tour);
             }
           }
         ).subscribe();
-      allChannels.push(tourCh);
+      allChannels.push(tourInsertCh);
+
+      const tourUpdateCh = supabase
+        .channel(`prod_tours_update_${driverId}`)
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tours', filter: `driver_id=eq.${driverId}` },
+          async (payload) => {
+            if (!isEventsReady) return;
+            const tour = payload.new;
+            console.log('[NotificationHub] Tour UPDATE:', { id: tour.id, status: tour.status, keys: Object.keys(tour) });
+            
+            // Supabase Realtime ohne REPLICA IDENTITY FULL liefert evtl. nur geänderte Spalten
+            // Wenn status vorhanden ist, prüfe auf cancelled/completed
+            if (tour.status) {
+              const cancelled = ['cancelled', 'canceled', 'storniert', 'abgebrochen', 'abgesagt'];
+              if (cancelled.includes(tour.status.toLowerCase())) {
+                // Hole volle Tour-Daten für die Notification-Message
+                let tourTitle = tour.pickup_address || tour.tour_title || 'Tour';
+                if (!tour.pickup_address && tour.id) {
+                  try {
+                    const { data: fullTour } = await supabase.from('tours').select('pickup_address, tour_title').eq('id', tour.id).single();
+                    if (fullTour) tourTitle = fullTour.pickup_address || fullTour.tour_title || 'Tour';
+                  } catch (_) {}
+                }
+                saveNotification('tour_cancelled', 'Tour storniert', tourTitle, tour);
+              }
+            }
+            
+            if (tour.approved_at) {
+              let tourTitle = tour.pickup_address || tour.tour_title || 'Tour';
+              if (!tour.pickup_address && tour.id) {
+                try {
+                  const { data: fullTour } = await supabase.from('tours').select('pickup_address, tour_title').eq('id', tour.id).single();
+                  if (fullTour) tourTitle = fullTour.pickup_address || fullTour.tour_title || 'Tour';
+                } catch (_) {}
+              }
+              saveNotification('tour_approved', 'Tour genehmigt', tourTitle, tour);
+            }
+          }
+        ).subscribe();
+      allChannels.push(tourUpdateCh);
 
       // Payments
       const payCh = supabase
