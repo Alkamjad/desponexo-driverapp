@@ -30,6 +30,7 @@ export default function TourDetails() {
   const [gpsActive, setGpsActive] = useState(false);
   const [piecesModalOpen, setPiecesModalOpen] = useState(false);
   const [documentationDialogOpen, setDocumentationDialogOpen] = useState(false);
+  const [arrivedAtCustomer, setArrivedAtCustomer] = useState(false);
   const [problemModalOpen, setProblemModalOpen] = useState(false);
 
   const tourId = new URLSearchParams(window.location.search).get('id');
@@ -362,8 +363,8 @@ export default function TourDetails() {
       </div>
 
       <div className="px-4 py-4 space-y-4">
-        {/* Notizen - Wichtig für Fahrer */}
-        {tour.notes && (
+        {/* Notizen - Wichtig für Fahrer (bei picked_up/in_transit für Nicht-Multi-Stop, sonst immer) */}
+        {tour.notes && (tour.is_multi_stop || ['picked_up', 'in_transit', 'assigned'].includes(tour.status)) && (
           <Card className="border-0 shadow-lg bg-amber-900/20 border-amber-500/30">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
@@ -371,7 +372,7 @@ export default function TourDetails() {
                   <FileText className="w-5 h-5 text-amber-400" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-amber-400 text-xs mb-1 font-bold">WICHTIGER Hinweis für die Tour </p>
+                  <p className="text-amber-400 text-xs mb-1 font-bold">WICHTIGER Hinweis für die Tour</p>
                   <p className="text-white font-medium leading-relaxed">{tour.notes}</p>
                 </div>
               </div>
@@ -458,110 +459,181 @@ export default function TourDetails() {
           </div>
         ) : null}
 
-        {/* Standard Abholadresse (nur wenn NICHT Multi-Stop) */}
-        {!tour.is_multi_stop && tour.pickup_address && (
-          <Card className="border-0 shadow-lg bg-slate-800">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-emerald-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-slate-400 text-xs mb-1">ABHOLUNG</p>
-                  <p className="text-white font-medium">{tour.pickup_address}</p>
-                  {tour.pickup_postal_code && tour.pickup_city && (
-                    <p className="text-slate-400 text-sm">{tour.pickup_postal_code} {tour.pickup_city}</p>
-                  )}
-                  {tour.pickup_contact && (
-                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
-                      <User className="w-3 h-3" /> {tour.pickup_contact}
-                    </p>
-                  )}
-                  {tour.pickup_phone && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-emerald-400 p-0 h-auto mt-1"
-                      onClick={() => callPhone(tour.pickup_phone)}
-                    >
-                      <Phone className="w-3 h-3 mr-1" /> {tour.pickup_phone}
-                    </Button>
-                  )}
-                </div>
-                <Button
-                  size="icon"
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => openNavigation(tour.pickup_address)}
-                >
-                  <Navigation className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* ===== STANDARD TOUREN (NICHT Multi-Stop) - Statusbasierte Adressen ===== */}
+        {!tour.is_multi_stop && (() => {
+          const status = tour.status;
 
-        {/* Kundenadresse (nur wenn NICHT Multi-Stop) */}
-        {!tour.is_multi_stop && tour.delivery_address && (
-          <Card className="border-0 shadow-lg bg-blue-900/20 border-blue-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-blue-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-blue-400 text-xs mb-1 font-bold">KUNDENADRESSE</p>
-                  <p className="text-white font-medium">{tour.delivery_address}</p>
-                  {tour.delivery_contact && (
-                    <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
-                      <User className="w-3 h-3" /> {tour.delivery_contact}
-                    </p>
-                  )}
-                  {tour.delivery_phone && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-blue-400 p-0 h-auto mt-1"
-                      onClick={() => callPhone(tour.delivery_phone)}
-                    >
-                      <Phone className="w-3 h-3 mr-1" /> {tour.delivery_phone}
-                    </Button>
-                  )}
-                </div>
-                <Button
-                  size="icon"
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={() => openNavigation(tour.delivery_address)}
-                >
-                  <Navigation className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          // === ASSIGNED: Alle 3 Adressen anzeigen ===
+          if (status === 'assigned') return (
+            <>
+              {tour.pickup_address && (
+                <Card className="border-0 shadow-lg bg-slate-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-slate-400 text-xs mb-1">ABHOLUNG</p>
+                        <p className="text-white font-medium">{tour.pickup_address}</p>
+                        {tour.pickup_postal_code && tour.pickup_city && (
+                          <p className="text-slate-400 text-sm">{tour.pickup_postal_code} {tour.pickup_city}</p>
+                        )}
+                      </div>
+                      <Button size="icon" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => openNavigation(tour.pickup_address)}>
+                        <Navigation className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {tour.delivery_address && (
+                <Card className="border-0 shadow-lg bg-blue-900/20 border-blue-500/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-blue-400 text-xs mb-1 font-bold">KUNDENADRESSE</p>
+                        <p className="text-white font-medium">{tour.delivery_address}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              {tour.destination_address && (
+                <Card className="border-0 shadow-lg bg-purple-900/20 border-purple-500/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-purple-400 text-xs mb-1 font-bold">ZIEL NACH LIEFERUNG</p>
+                        <p className="text-white font-medium">{tour.destination_address}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
 
-        {/* Zieladresse nach Lieferung (nur wenn NICHT Multi-Stop) */}
-        {!tour.is_multi_stop && tour.destination_address && (
-          <Card className="border-0 shadow-lg bg-purple-900/20 border-purple-500/30">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <MapPin className="w-5 h-5 text-purple-400" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-purple-400 text-xs mb-1 font-bold">ZIEL NACH LIEFERUNG</p>
-                  <p className="text-white font-medium">{tour.destination_address}</p>
-                </div>
-                <Button
-                  size="icon"
-                  className="bg-purple-600 hover:bg-purple-700"
-                  onClick={() => openNavigation(tour.destination_address)}
-                >
-                  <Navigation className="w-4 h-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+          // === CONFIRMED: Nur Abholadresse + Startzeit + Tour-Infos ===
+          if (status === 'confirmed') return (
+            <>
+              {tour.pickup_address && (
+                <Card className="border-0 shadow-lg bg-slate-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-slate-400 text-xs mb-1">ABHOLUNG</p>
+                        <p className="text-white font-medium">{tour.pickup_address}</p>
+                        {tour.pickup_postal_code && tour.pickup_city && (
+                          <p className="text-slate-400 text-sm">{tour.pickup_postal_code} {tour.pickup_city}</p>
+                        )}
+                        {tour.pickup_contact && (
+                          <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3" /> {tour.pickup_contact}
+                          </p>
+                        )}
+                        {tour.pickup_phone && (
+                          <Button variant="ghost" size="sm" className="text-emerald-400 p-0 h-auto mt-1" onClick={() => callPhone(tour.pickup_phone)}>
+                            <Phone className="w-3 h-3 mr-1" /> {tour.pickup_phone}
+                          </Button>
+                        )}
+                      </div>
+                      <Button size="icon" className="bg-emerald-600 hover:bg-emerald-700" onClick={() => openNavigation(tour.pickup_address)}>
+                        <Navigation className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {/* Startzeit */}
+                    {tour.scheduled_pickup_from && (
+                      <div className="mt-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300 text-sm font-medium">
+                          Abholung: {moment(tour.scheduled_pickup_from).format('HH:mm')} Uhr
+                          {tour.scheduled_pickup_to && ` - ${moment(tour.scheduled_pickup_to).format('HH:mm')} Uhr`}
+                        </span>
+                      </div>
+                    )}
+                    {/* Allgemeine Tour-Infos */}
+                    {(tour.cargo_description || tour.weight || tour.volume) && (
+                      <div className="mt-3 bg-slate-700/50 rounded-lg p-3 space-y-1">
+                        {tour.cargo_description && (
+                          <p className="text-slate-300 text-sm flex items-center gap-2">
+                            <Package className="w-3 h-3 text-slate-400" /> {tour.cargo_description}
+                          </p>
+                        )}
+                        {tour.weight && (
+                          <p className="text-slate-400 text-xs">Gewicht: {tour.weight}</p>
+                        )}
+                        {tour.volume && (
+                          <p className="text-slate-400 text-xs">Volumen: {tour.volume}</p>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+
+          // === PICKED_UP / IN_TRANSIT: Kundenadresse + Hinweise ===
+          if (['picked_up', 'in_transit'].includes(status)) return (
+            <>
+              {tour.delivery_address && (
+                <Card className="border-0 shadow-lg bg-blue-900/20 border-blue-500/30">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <MapPin className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-blue-400 text-xs mb-1 font-bold">KUNDENADRESSE</p>
+                        <p className="text-white font-medium">{tour.delivery_address}</p>
+                        {tour.delivery_postal_code && tour.delivery_city && (
+                          <p className="text-slate-400 text-sm">{tour.delivery_postal_code} {tour.delivery_city}</p>
+                        )}
+                        {tour.delivery_contact && (
+                          <p className="text-slate-400 text-sm mt-1 flex items-center gap-1">
+                            <User className="w-3 h-3" /> {tour.delivery_contact}
+                          </p>
+                        )}
+                        {tour.delivery_phone && (
+                          <Button variant="ghost" size="sm" className="text-blue-400 p-0 h-auto mt-1" onClick={() => callPhone(tour.delivery_phone)}>
+                            <Phone className="w-3 h-3 mr-1" /> {tour.delivery_phone}
+                          </Button>
+                        )}
+                      </div>
+                      <Button size="icon" className="bg-blue-600 hover:bg-blue-700" onClick={() => openNavigation(tour.delivery_address)}>
+                        <Navigation className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    {/* Lieferzeitfenster */}
+                    {tour.scheduled_delivery_from && (
+                      <div className="mt-3 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-400" />
+                        <span className="text-blue-300 text-sm font-medium">
+                          Lieferung: {moment(tour.scheduled_delivery_from).format('HH:mm')} Uhr
+                          {tour.scheduled_delivery_to && ` - ${moment(tour.scheduled_delivery_to).format('HH:mm')} Uhr`}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+
+          // === DELIVERED: Zieladresse zurück (wird unten im Action-Bereich gehandhabt) ===
+          // === COMPLETED / CANCELLED: Keine Adressen nötig ===
+          return null;
+        })()}
 
         {/* Action Buttons - Neuer Workflow */}
         <div className="space-y-3">
@@ -603,36 +675,58 @@ export default function TourDetails() {
 
 
 
-          {/* Schritt 3: Ausgeliefert - Button nur zeigen wenn NICHT Multi-Stop ODER wenn Multi-Stop und alle Stops fertig */}
-          {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && (
+          {/* Schritt 3: Beim Kunden angekommen + Nachweis + Ausgeliefert (NICHT Multi-Stop) */}
+          {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && !tour.is_multi_stop && (
             <>
-              {!tour.is_multi_stop ? (
+              {!arrivedAtCustomer ? (
+                /* Schritt 3a: "Beim Kunden angekommen" Button */
                 <Button 
-                  className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
-                  onClick={() => {
-                    const hasDoc = tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0;
-                    if (hasDoc && tour.documentation_status === 'pending') {
-                      setDocumentationDialogOpen(true);
-                    } else {
-                      handleDeliver();
-                    }
-                  }}
+                  className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-lg font-semibold"
+                  onClick={() => setArrivedAtCustomer(true)}
                   disabled={isUpdating}
                 >
-                  {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
-                  {(tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0 && tour.documentation_status === 'pending') ? 'Nachweis hochladen' : t('tours_deliver')}
+                  <MapPin className="w-5 h-5 mr-2" />
+                  Beim Kunden angekommen
                 </Button>
-              ) : allStopsCompleted && (
-                <Button 
-                  className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
-                  onClick={() => updateStatus('delivered')}
-                  disabled={isUpdating}
-                >
-                  {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
-                  Tour als ausgeliefert markieren
-                </Button>
+              ) : (
+                /* Schritt 3b: Nach Ankunft → Nachweis hochladen (falls nötig) + Ausgeliefert */
+                <>
+                  {/* Nachweis hochladen - falls Dokumentation erforderlich */}
+                  {tour.documentation_requirements && Object.keys(tour.documentation_requirements).length > 0 && tour.documentation_status === 'pending' ? (
+                    <Button 
+                      className="w-full h-14 bg-amber-600 hover:bg-amber-700 text-lg font-semibold"
+                      onClick={() => setDocumentationDialogOpen(true)}
+                      disabled={isUpdating}
+                    >
+                      {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <FileText className="w-5 h-5 mr-2" />}
+                      Nachweis hochladen
+                    </Button>
+                  ) : null}
+
+                  {/* Ausgeliefert Button */}
+                  <Button 
+                    className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
+                    onClick={handleDeliver}
+                    disabled={isUpdating}
+                  >
+                    {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
+                    {t('tours_deliver')}
+                  </Button>
+                </>
               )}
             </>
+          )}
+
+          {/* Multi-Stop: Ausgeliefert wenn alle Stops fertig */}
+          {!isFuture && ['picked_up', 'in_transit'].includes(tour.status) && tour.is_multi_stop && allStopsCompleted && (
+            <Button 
+              className="w-full h-14 bg-green-600 hover:bg-green-700 text-lg font-semibold"
+              onClick={() => updateStatus('delivered')}
+              disabled={isUpdating}
+            >
+              {isUpdating ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Truck className="w-5 h-5 mr-2" />}
+              Tour als ausgeliefert markieren
+            </Button>
           )}
 
           {/* Erfolgsmeldung - Bitte zurück fahren */}
