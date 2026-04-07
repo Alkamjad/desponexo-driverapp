@@ -72,8 +72,8 @@ Deno.serve(async (req) => {
     }
 
     if (!driver) {
-      console.error('Driver not found for user:', user.id, user.email);
-      return Response.json({ success: false, error: 'Driver not found' }, { status: 403, headers: corsHeaders });
+      console.error('Driver not found - user_id:', user.id, 'email:', user.email, 'bodyDriverId:', bodyDriverId);
+      return Response.json({ success: false, error: 'Driver not found - contact support' }, { status: 403, headers: corsHeaders });
     }
 
     // Validate problem_type against DB constraint
