@@ -53,13 +53,23 @@ Deno.serve(async (req) => {
       driver = driverByEmail;
     }
 
+    // Fallback: look up by driver_id from payload (user already authenticated above)
+    if (!driver && bodyDriverId) {
+      const { data: driverById } = await supabase
+        .from('drivers')
+        .select('id, email, full_name, company_id')
+        .eq('id', bodyDriverId)
+        .maybeSingle();
+      driver = driverById;
+    }
+
     if (!driver) {
       console.error('Driver not found for user:', user.id, user.email);
       return Response.json({ success: false, error: 'Driver not found' }, { status: 403, headers: corsHeaders });
     }
 
     const body = await req.json();
-    const { tour_id, problem_type, beschreibung, foto_url } = body;
+    const { tour_id, problem_type, beschreibung, foto_url, driver_id: bodyDriverId } = body;
 
     if (!problem_type || !beschreibung) {
       return Response.json({ success: false, error: 'Missing required fields: problem_type, beschreibung' }, { status: 400, headers: corsHeaders });

@@ -867,7 +867,8 @@ export default function TourDetails() {
               const data = await callFunction('submitProblemReport', {
                 tour_id: tour.tour_id || tourId,
                 problem_type: problemData.reason || 'sonstiges',
-                beschreibung: problemData.details || problemData.reason || 'Problem gemeldet'
+                beschreibung: problemData.details || problemData.reason || 'Problem gemeldet',
+                driver_id: driverId
               });
               if (data?.success) {
                 toast.success('Problem wurde gemeldet');
